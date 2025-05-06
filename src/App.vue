@@ -7,6 +7,7 @@
 
 <script>
 import Button from "./components/Button.vue";
+import Navbar from "./components/Navbar.vue";
 import "./assets/main.css";
 
 export default {
