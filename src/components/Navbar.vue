@@ -31,7 +31,7 @@
 
 <style scoped>
 .navbar {
-  background-color: var(--dark-grey);
+  background-color: var(--white);
   padding: 1rem 2rem;
   border-bottom: 1px solid var(--light-grey);
 }
@@ -48,7 +48,7 @@
   font-family: var(--font-family);
   font-weight: 700;
   font-size: 1.5rem;
-  color: var(--white);
+  color: var(--dark-grey);
   text-decoration: none;
   display: flex;
   align-items: center;
@@ -64,7 +64,7 @@
 }
 
 .home-link {
-  color: var(--white);
+  color: var(--dark-grey);
   transition: color 0.2s;
 }
 
