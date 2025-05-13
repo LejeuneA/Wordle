@@ -59,51 +59,73 @@ function updateBoard() {
 }
 
 // Submit the current word and check if it's correct
-function submitWord() {
-  if (currentInput.value.length === 5) {
-    const guess = currentInput.value.join('')
-    const statuses = Array(5).fill('gray')
-    const targetArray = targetWord.value.split('')
-    const used = Array(5).fill(false)
+async function submitWord() {
+  if (currentInput.value.length !== 5) return
 
-    // First pass: correct positions (green)
-    for (let i = 0; i < 5; i++) {
-      if (guess[i] === targetArray[i]) {
-        statuses[i] = 'green'
-        used[i] = true
-        keyStatuses.value[guess[i]] = 'green'
-      }
-    }
+  const guess = currentInput.value.join('')
 
-    // Second pass: wrong positions (yellow)
-    for (let i = 0; i < 5; i++) {
-      if (statuses[i] === 'green') continue
-      const index = targetArray.findIndex((c, idx) => c === guess[i] && !used[idx])
-      if (index !== -1) {
-        statuses[i] = 'yellow'
-        used[index] = true
-        if (keyStatuses.value[guess[i]] !== 'green') {
-          keyStatuses.value[guess[i]] = 'yellow'
-        }
-      } else {
-        if (!keyStatuses.value[guess[i]]) {
-          keyStatuses.value[guess[i]] = 'gray'
-        }
-      }
-    }
+  // Check if the word exists using Wiktionary
+  const isValid = await validateFrenchWord(guess)
+  if (!isValid) {
+    alert('Ce mot n’existe pas dans le dictionnaire.')
+    return
+  }
 
-    words.value[currentAttempt.value].statuses = statuses
+  const statuses = Array(5).fill('gray')
+  const targetArray = targetWord.value.split('')
+  const used = Array(5).fill(false)
 
-    if (guess === targetWord.value) {
-      alert('Bravo ! Vous avez trouvé le mot.')
-    } else if (currentAttempt.value < 5) {
-      currentAttempt.value++
-      currentInput.value = []
-    } else {
-      alert(`Dommage ! Le mot était : ${targetWord.value}`)
+  // Pass 1: Exact matches (green)
+  for (let i = 0; i < 5; i++) {
+    if (guess[i] === targetArray[i]) {
+      statuses[i] = 'green'
+      used[i] = true
+      keyStatuses.value[guess[i]] = 'green'
     }
   }
+
+  // Pass 2: Wrong positions (yellow)
+  for (let i = 0; i < 5; i++) {
+    if (statuses[i] === 'green') continue
+    const index = targetArray.findIndex((c, idx) => c === guess[i] && !used[idx])
+    if (index !== -1) {
+      statuses[i] = 'yellow'
+      used[index] = true
+      if (keyStatuses.value[guess[i]] !== 'green') {
+        keyStatuses.value[guess[i]] = 'yellow'
+      }
+    } else {
+      if (!keyStatuses.value[guess[i]]) {
+        keyStatuses.value[guess[i]] = 'gray'
+      }
+    }
+  }
+
+  words.value[currentAttempt.value].statuses = statuses
+
+  if (guess === targetWord.value) {
+    alert('Bravo ! Vous avez trouvé le mot.')
+  } else if (currentAttempt.value < 5) {
+    currentAttempt.value++
+    currentInput.value = []
+  } else {
+    alert(`Dommage ! Le mot était : ${targetWord.value}`)
+  }
 }
+
+async function validateFrenchWord(word) {
+  const url = `https://fr.wiktionary.org/w/api.php?action=query&titles=${word.toLowerCase()}&format=json&origin=*`
+  try {
+    const res = await fetch(url)
+    const data = await res.json()
+    return !data.query.pages['-1'] // If page "-1" does not exist, the word is valid
+  } catch (err) {
+    console.error('Erreur lors de la validation du mot :', err)
+    return false 
+  }
+}
+
+
 
 // Handle physical keyboard input
 function onKeydown(e) {
@@ -115,12 +137,17 @@ function onKeydown(e) {
 
 // Fetch a word to guess from the API
 onMounted(async () => {
+  // Enable physical keyboard inputs
   window.addEventListener('keydown', onKeydown)
+
   try {
-    const response = await fetch('https://trouve-mot.fr/api/size/5')
-    const data = await response.json()
-    const word = data[0]?.name
-    if (!word) throw new Error('Mot non trouvé dans la réponse')
+    let word = ''
+    do {
+      const response = await fetch('https://trouve-mot.fr/api/size/5')
+      const data = await response.json()
+      word = data[0]?.name ?? ''
+    } while (/[À-ÿ]/.test(word)) // Filter out words with accents or special characters
+
     targetWord.value = word.toUpperCase()
     console.log('Mot à deviner :', targetWord.value)
 
@@ -129,6 +156,8 @@ onMounted(async () => {
     console.error('Erreur lors de la récupération du mot :', error)
   }
 })
+
+
 
 // Clean up by removing the event listener on unmount
 onBeforeUnmount(() => {
