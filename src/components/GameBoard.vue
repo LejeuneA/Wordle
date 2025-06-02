@@ -1,10 +1,23 @@
 <template>
-  <div class="game-board">
-    <Word v-for="(word, index) in words" :key="index" :letters="word.letters" :statuses="word.statuses" />
-    <Keyboard :keyStatuses="keyStatuses" @keyPress="handleKeyPress" @submitWord="submitWord"
-      @deleteLetter="deleteLetter" />
+  <div class="game-board-wrapper">
+    <div class="game-board">
+      <Word
+        v-for="(word, index) in words"
+        :key="index"
+        :letters="word.letters"
+        :statuses="word.statuses"
+      />
+      <Keyboard
+        :keyStatuses="keyStatuses"
+        @keyPress="handleKeyPress"
+        @submitWord="submitWord"
+        @deleteLetter="deleteLetter"
+      />
+    </div>
   </div>
 </template>
+
+
 
 <script setup>
 import { ref, onMounted } from 'vue'
@@ -144,10 +157,29 @@ onMounted(async () => {
 </script>
 
 <style scoped>
+.game-board-wrapper {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  padding: 2rem;
+  background-color: var(--white); /* this changes automatically if dark mode updates it */
+  color: var(--dark-grey);
+}
+
 .game-board {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: 1.5rem;
   align-items: center;
+  background-color: var(--light-grey); /* or use var(--white) for more contrast */
+  padding: 2rem;
+  border-radius: 12px;
+  box-shadow: 0 0 12px rgba(0, 0, 0, 0.15);
+  max-width: 500px;
+  width: 100%;
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 </style>
+
+
