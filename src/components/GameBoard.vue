@@ -1,33 +1,24 @@
 <template>
   <div class="game-board">
-    <Word
-      v-for="(word, index) in words"
-      :key="index"
-      :letters="word.letters"
-      :statuses="word.statuses"
-    />
-    <Keyboard
-      :keyStatuses="keyStatuses"        
-      @keyPress="handleKeyPress"         
-      @submitWord="submitWord"           
-      @deleteLetter="deleteLetter"       
-    />
+    <Word v-for="(word, index) in words" :key="index" :letters="word.letters" :statuses="word.statuses" />
+    <Keyboard :keyStatuses="keyStatuses" @keyPress="handleKeyPress" @submitWord="submitWord"
+      @deleteLetter="deleteLetter" />
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, onBeforeUnmount } from 'vue'
+import { ref, onMounted } from 'vue'
 import Word from './Word.vue'
-import Keyboard from './Keyboard.vue'
+import Keyboard from './KeyboardLayout.vue'
 
-// State variables
-const words = ref([])  // Holds the current game board (attempts)
-const currentAttempt = ref(0)  // Tracks the current attempt number
-const currentInput = ref([])  // Tracks the current input for the guess
-const targetWord = ref('')  // The target word to guess
-const keyStatuses = ref({})  // Stores the status of each key (gray, yellow, green)
+// State
+const words = ref([])
+const currentAttempt = ref(0)
+const currentInput = ref([])
+const targetWord = ref('')
+const keyStatuses = ref({})
 
-// Initialize the board with empty attempts
+// Setup empty board
 function initBoard() {
   words.value = Array.from({ length: 6 }, () => ({
     letters: Array(5).fill(''),
@@ -35,16 +26,16 @@ function initBoard() {
   }))
 }
 
-// Handle key presses for letters
+// Handle letter input
 function handleKeyPress(key) {
-  if (!/^[A-Z]$/.test(key)) return // Only allow uppercase alphabetic characters
+  if (!/^[A-Z]$/.test(key)) return
   if (currentInput.value.length < 5 && currentAttempt.value < 6) {
     currentInput.value.push(key)
     updateBoard()
   }
 }
 
-// Delete the last entered letter
+// Delete last letter
 function deleteLetter() {
   if (currentInput.value.length > 0) {
     currentInput.value.pop()
@@ -52,19 +43,19 @@ function deleteLetter() {
   }
 }
 
-// Update the game board with the current input
+// Apply currentInput to current board row
 function updateBoard() {
   const attempt = words.value[currentAttempt.value]
   attempt.letters = [...currentInput.value, ...Array(5 - currentInput.value.length).fill('')]
 }
 
-// Submit the current word and check if it's correct
+// Submit guess
 async function submitWord() {
   if (currentInput.value.length !== 5) return
 
   const guess = currentInput.value.join('')
 
-  // Check if the word exists using Wiktionary
+  // Validate with Wiktionary API
   const isValid = await validateFrenchWord(guess)
   if (!isValid) {
     alert('Ce mot n’existe pas dans le dictionnaire.')
@@ -75,7 +66,7 @@ async function submitWord() {
   const targetArray = targetWord.value.split('')
   const used = Array(5).fill(false)
 
-  // Pass 1: Exact matches (green)
+  // First pass: correct positions (green)
   for (let i = 0; i < 5; i++) {
     if (guess[i] === targetArray[i]) {
       statuses[i] = 'green'
@@ -84,7 +75,7 @@ async function submitWord() {
     }
   }
 
-  // Pass 2: Wrong positions (yellow)
+  // Second pass: wrong positions (yellow)
   for (let i = 0; i < 5; i++) {
     if (statuses[i] === 'green') continue
     const index = targetArray.findIndex((c, idx) => c === guess[i] && !used[idx])
@@ -113,55 +104,42 @@ async function submitWord() {
   }
 }
 
+// Validate word existence with Wiktionary API
 async function validateFrenchWord(word) {
-  const url = `https://fr.wiktionary.org/w/api.php?action=query&titles=${word.toLowerCase()}&format=json&origin=*`
+  const url = `https://fr.wiktionary.org/w/api.php?action=parse&page=${word.toLowerCase()}&prop=text&format=json&origin=*`
   try {
     const res = await fetch(url)
     const data = await res.json()
-    return !data.query.pages['-1'] // If page "-1" does not exist, the word is valid
+
+    const html = data.parse?.text["*"]
+    if (!html) return false
+
+    // Check if the French section exists in the HTML (e.g., "<h2>Français")
+    const isFrench = html.includes('langue="fr"') || html.includes('Français')
+    return isFrench
   } catch (err) {
-    console.error('Erreur lors de la validation du mot :', err)
-    return false 
+    console.error('Erreur de validation avec Wiktionary :', err)
+    return false
   }
 }
 
 
-
-// Handle physical keyboard input
-function onKeydown(e) {
-  const key = e.key.toUpperCase()
-  if (key === 'BACKSPACE') deleteLetter()
-  else if (key === 'ENTER') submitWord()
-  else handleKeyPress(key)
-}
-
-// Fetch a word to guess from the API
+// Fetch target word from public API
 onMounted(async () => {
-  // Enable physical keyboard inputs
-  window.addEventListener('keydown', onKeydown)
-
   try {
     let word = ''
     do {
-      const response = await fetch('https://trouve-mot.fr/api/size/5')
-      const data = await response.json()
+      const res = await fetch('https://trouve-mot.fr/api/size/5')
+      const data = await res.json()
       word = data[0]?.name ?? ''
-    } while (/[À-ÿ]/.test(word)) // Filter out words with accents or special characters
+    } while (/[À-ÿ]/.test(word)) // Filter words with accents
 
     targetWord.value = word.toUpperCase()
     console.log('Mot à deviner :', targetWord.value)
-
     initBoard()
-  } catch (error) {
-    console.error('Erreur lors de la récupération du mot :', error)
+  } catch (err) {
+    console.error('Erreur lors de la récupération du mot :', err)
   }
-})
-
-
-
-// Clean up by removing the event listener on unmount
-onBeforeUnmount(() => {
-  window.removeEventListener('keydown', onKeydown)
 })
 </script>
 

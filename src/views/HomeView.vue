@@ -9,7 +9,7 @@
         <Button
           size="medium"
           customClass="primary"
-          @click="$router.push('/GameBoard')"
+          @click="$router.push('/game')"
         >
           Jouer
         </Button>
