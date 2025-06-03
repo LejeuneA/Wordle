@@ -52,7 +52,8 @@ import Button from "@/components/Button.vue";
   display: flex;
   justify-content: center;
   align-items: center;
-  padding: 20px;
+  padding: 2rem;
+  transition: background-color 0.3s ease;
 }
 
 .content-box {
@@ -66,6 +67,7 @@ import Button from "@/components/Button.vue";
   justify-content: center;
   padding: 40px;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 .logo {
