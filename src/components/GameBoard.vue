@@ -22,23 +22,27 @@ import { ref, onMounted, onUnmounted, watch } from "vue";
 import Word from "./Word.vue";
 import Keyboard from "./KeyboardLayout.vue";
 
-// State
 const words = ref([]);
 const currentAttempt = ref(0);
 const currentInput = ref([]);
-const targetWord = ref("");
+const targetWord = ref("");          // Without accents, used for game logic
+const targetWordAccented = ref("");  // With accents, used for validation
 const keyStatuses = ref({});
 const currentLanguage = ref("en");
 
-// Watch for state changes to save
+// Utility function to remove accents from a string
+function removeAccents(str) {
+  return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+}
+
+// Watch relevant state to save the game in localStorage
 watch([words, currentAttempt, currentInput, keyStatuses, targetWord], saveGame, {
   deep: true,
 });
 
-// LocalStorage Keys
 const STORAGE_KEY = "wordleGameState";
 
-// Setup empty board
+// Initialize the game board
 function initBoard() {
   words.value = Array.from({ length: 6 }, () => ({
     letters: Array(5).fill(""),
@@ -46,7 +50,7 @@ function initBoard() {
   }));
 }
 
-// Save current game to LocalStorage
+// Save game state to localStorage
 function saveGame() {
   const state = {
     words: words.value,
@@ -54,12 +58,13 @@ function saveGame() {
     currentInput: currentInput.value,
     keyStatuses: keyStatuses.value,
     targetWord: targetWord.value,
+    targetWordAccented: targetWordAccented.value,
     language: currentLanguage.value,
   };
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
 }
 
-// Load game from LocalStorage if exists
+// Load game state from localStorage
 function loadGame() {
   const saved = localStorage.getItem(STORAGE_KEY);
   if (saved) {
@@ -71,9 +76,10 @@ function loadGame() {
         currentInput.value = state.currentInput || [];
         keyStatuses.value = state.keyStatuses || {};
         targetWord.value = state.targetWord;
+        targetWordAccented.value = state.targetWordAccented || targetWord.value;
         currentLanguage.value = state.language || "en";
-        updateBoard(); // Reapply current input
-        console.log("Resumed word:", targetWord.value);
+        updateBoard();
+        console.log("Resumed word:", targetWordAccented.value);
         return true;
       }
     } catch (err) {
@@ -83,7 +89,7 @@ function loadGame() {
   return false;
 }
 
-// Handle letter input
+// Handle key press for letters
 function handleKeyPress(key) {
   if (!/^[A-Z]$/.test(key)) return;
   if (currentInput.value.length < 5 && currentAttempt.value < 6) {
@@ -92,7 +98,7 @@ function handleKeyPress(key) {
   }
 }
 
-// Delete last letter
+// Delete last letter entered
 function deleteLetter() {
   if (currentInput.value.length > 0) {
     currentInput.value.pop();
@@ -100,7 +106,7 @@ function deleteLetter() {
   }
 }
 
-// Apply currentInput to current board row
+// Update the board's current attempt with the current input letters
 function updateBoard() {
   const attempt = words.value[currentAttempt.value];
   attempt.letters = [
@@ -109,17 +115,47 @@ function updateBoard() {
   ];
 }
 
-// Submit guess
+// Validate a French word using Wiktionary
+// Tries first with accented word, then without accents if not found
+async function validateFrenchWord(word) {
+  // Internal function to check Wiktionary for a given word
+  async function checkWord(w) {
+    const url = `https://fr.wiktionary.org/w/api.php?action=parse&page=${w.toLowerCase()}&prop=text&format=json&origin=*`;
+    try {
+      const res = await fetch(url);
+      const data = await res.json();
+      const html = data.parse?.text["*"];
+      if (!html) return false;
+      return html.includes('langue="fr"') || html.includes("Français");
+    } catch (err) {
+      console.error("Validation error with Wiktionary:", err);
+      return false;
+    }
+  }
+
+  // Try accented version first
+  let valid = await checkWord(word);
+  if (valid) return true;
+
+  // If not valid, try without accents
+  const noAccentWord = removeAccents(word);
+  if (noAccentWord !== word) {
+    valid = await checkWord(noAccentWord);
+  }
+
+  return valid;
+}
+
+// Submit the current guess, validate and update the game state
 async function submitWord() {
   if (currentInput.value.length !== 5) return;
 
   const guess = currentInput.value.join("");
 
-  // Validate French words
   if (currentLanguage.value === "fr") {
     const isValid = await validateFrenchWord(guess);
     if (!isValid) {
-      alert("Ce mot n'existe pas dans le dictionnaire.");
+      alert("This word does not exist in the dictionary.");
       return;
     }
   }
@@ -128,7 +164,7 @@ async function submitWord() {
   const targetArray = targetWord.value.split("");
   const used = Array(5).fill(false);
 
-  // First pass (green)
+  // First pass - green (correct letter and position)
   for (let i = 0; i < 5; i++) {
     if (guess[i] === targetArray[i]) {
       statuses[i] = "green";
@@ -137,7 +173,7 @@ async function submitWord() {
     }
   }
 
-  // Second pass (yellow)
+  // Second pass - yellow (correct letter, wrong position)
   for (let i = 0; i < 5; i++) {
     if (statuses[i] === "green") continue;
     const index = targetArray.findIndex(
@@ -159,67 +195,51 @@ async function submitWord() {
   words.value[currentAttempt.value].statuses = statuses;
 
   if (guess === targetWord.value) {
-    alert("Bravo ! Vous avez trouvé le mot.");
+    alert("Congratulations! You found the word.");
   } else if (currentAttempt.value < 5) {
     currentAttempt.value++;
     currentInput.value = [];
   } else {
-    alert(`Dommage ! Le mot était : ${targetWord.value}`);
+    alert(`Too bad! The word was: ${targetWordAccented.value}`);
   }
 }
 
-// French dictionary validator
-async function validateFrenchWord(word) {
-  const url = `https://fr.wiktionary.org/w/api.php?action=parse&page=${word.toLowerCase()}&prop=text&format=json&origin=*`;
-  try {
-    const res = await fetch(url);
-    const data = await res.json();
-    const html = data.parse?.text["*"];
-    if (!html) return false;
-    return html.includes('langue="fr"') || html.includes("Français");
-  } catch (err) {
-    console.error("Erreur de validation avec Wiktionary :", err);
-    return false;
-  }
-}
-
-// Fetch word from API
+// Fetch a random 5-letter word for the chosen language
 async function fetchWord(lang) {
   try {
     const url = `https://random-word-api.herokuapp.com/word?lang=${lang}&number=1&length=5`;
     const res = await fetch(url);
     const data = await res.json();
-    return removeAccents(data[0]?.toUpperCase() || "");
+    return data[0]?.toUpperCase() || "";
   } catch (err) {
     console.error("Error fetching word:", err);
     return "";
   }
 }
 
-// Start a new game
+// Initialize a new game or restore from localStorage
 async function initGame() {
   const lang = localStorage.getItem("wordleLanguage") || "en";
   currentLanguage.value = lang;
 
-  // Try to restore from saved state
   if (loadGame()) return;
 
-  let word = "";
+  let wordAccented = "";
   do {
-    word = await fetchWord(lang);
-  } while (!word || word.length !== 5);
+    wordAccented = await fetchWord(lang);
+  } while (!wordAccented || wordAccented.length !== 5);
 
-  targetWord.value = word;
-  console.log("Word to guess:", targetWord.value);
+  targetWordAccented.value = wordAccented.toUpperCase();
+  targetWord.value = removeAccents(targetWordAccented.value);
 
   currentInput.value = [];
   currentAttempt.value = 0;
   keyStatuses.value = {};
   initBoard();
-  saveGame(); // Save initial state
+  saveGame();
 }
 
-// Handle language change
+// Handle language change event, reset game
 function handleLanguageChange() {
   localStorage.removeItem(STORAGE_KEY);
   initGame();
@@ -233,13 +253,8 @@ onMounted(() => {
 onUnmounted(() => {
   window.removeEventListener("languageChanged", handleLanguageChange);
 });
-
-function removeAccents(str) {
-  return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-}
-
-
 </script>
+
 
 <style scoped>
 .game-board-wrapper {
