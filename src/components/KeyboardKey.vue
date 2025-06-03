@@ -48,6 +48,7 @@ defineEmits(['key-press'])
 .del-key{
   font-size: 20px;
 }
+/* Apply colors for correct/present/absent */
 .correct {
   background-color: #6aaa64;
 }
