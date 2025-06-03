@@ -72,7 +72,7 @@ async function submitWord() {
   // Validate with Wiktionary API
   const isValid = await validateFrenchWord(guess);
   if (!isValid) {
-    alert("Ce mot n’existe pas dans le dictionnaire.");
+    alert("Ce mot n'existe pas dans le dictionnaire.");
     return;
   }
 
@@ -163,12 +163,13 @@ onMounted(async () => {
   display: flex;
   justify-content: center;
   align-items: center;
+  background-size: cover;
+  background-position: center;
   height: 100vh;
   padding: 2rem;
-  background-color: var(
-    --white
-  ); /* this changes automatically if dark mode updates it */
+  background-image: url("/images/word-background-light.jpg");
   color: var(--dark-grey);
+  transition: background-color 0.3s ease;
 }
 
 .game-board {
@@ -176,14 +177,23 @@ onMounted(async () => {
   flex-direction: column;
   gap: 1.5rem;
   align-items: center;
-  background-color: var(
-    --light-grey
-  ); /* or use var(--white) for more contrast */
+  background-color: var(--dark-grey);
   padding: 2rem;
   border-radius: 12px;
-  box-shadow: 0 0 12px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
   max-width: 500px;
   width: 100%;
   transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Dark mode styles */
+.dark .game-board-wrapper {
+  background-image: url("/images/word-background-dark.jpg");
+  color: var(--white);
+}
+
+.dark .game-board {
+  background-color: var(--white);
+  color: var(--white);
 }
 </style>
