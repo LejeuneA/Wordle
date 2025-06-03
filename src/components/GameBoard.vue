@@ -18,7 +18,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from "vue";
+import { ref, onMounted, onUnmounted, watch } from "vue";
 import Word from "./Word.vue";
 import Keyboard from "./KeyboardLayout.vue";
 
@@ -28,6 +28,15 @@ const currentAttempt = ref(0);
 const currentInput = ref([]);
 const targetWord = ref("");
 const keyStatuses = ref({});
+const currentLanguage = ref("en");
+
+// Watch for state changes to save
+watch([words, currentAttempt, currentInput, keyStatuses, targetWord], saveGame, {
+  deep: true,
+});
+
+// LocalStorage Keys
+const STORAGE_KEY = "wordleGameState";
 
 // Setup empty board
 function initBoard() {
@@ -35,6 +44,43 @@ function initBoard() {
     letters: Array(5).fill(""),
     statuses: Array(5).fill(""),
   }));
+}
+
+// Save current game to LocalStorage
+function saveGame() {
+  const state = {
+    words: words.value,
+    currentAttempt: currentAttempt.value,
+    currentInput: currentInput.value,
+    keyStatuses: keyStatuses.value,
+    targetWord: targetWord.value,
+    language: currentLanguage.value,
+  };
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+
+// Load game from LocalStorage if exists
+function loadGame() {
+  const saved = localStorage.getItem(STORAGE_KEY);
+  if (saved) {
+    try {
+      const state = JSON.parse(saved);
+      if (state.targetWord && state.targetWord.length === 5) {
+        words.value = state.words || [];
+        currentAttempt.value = state.currentAttempt || 0;
+        currentInput.value = state.currentInput || [];
+        keyStatuses.value = state.keyStatuses || {};
+        targetWord.value = state.targetWord;
+        currentLanguage.value = state.language || "en";
+        updateBoard(); // Reapply current input
+        console.log("Resumed word:", targetWord.value);
+        return true;
+      }
+    } catch (err) {
+      console.warn("Failed to load saved game:", err);
+    }
+  }
+  return false;
 }
 
 // Handle letter input
@@ -69,18 +115,20 @@ async function submitWord() {
 
   const guess = currentInput.value.join("");
 
-  // Validate with Wiktionary API
-  const isValid = await validateFrenchWord(guess);
-  if (!isValid) {
-    alert("Ce mot n'existe pas dans le dictionnaire.");
-    return;
+  // Validate French words
+  if (currentLanguage.value === "fr") {
+    const isValid = await validateFrenchWord(guess);
+    if (!isValid) {
+      alert("Ce mot n'existe pas dans le dictionnaire.");
+      return;
+    }
   }
 
   const statuses = Array(5).fill("gray");
   const targetArray = targetWord.value.split("");
   const used = Array(5).fill(false);
 
-  // First pass: correct positions (green)
+  // First pass (green)
   for (let i = 0; i < 5; i++) {
     if (guess[i] === targetArray[i]) {
       statuses[i] = "green";
@@ -89,7 +137,7 @@ async function submitWord() {
     }
   }
 
-  // Second pass: wrong positions (yellow)
+  // Second pass (yellow)
   for (let i = 0; i < 5; i++) {
     if (statuses[i] === "green") continue;
     const index = targetArray.findIndex(
@@ -120,41 +168,70 @@ async function submitWord() {
   }
 }
 
-// Validate word existence with Wiktionary API
+// French dictionary validator
 async function validateFrenchWord(word) {
   const url = `https://fr.wiktionary.org/w/api.php?action=parse&page=${word.toLowerCase()}&prop=text&format=json&origin=*`;
   try {
     const res = await fetch(url);
     const data = await res.json();
-
     const html = data.parse?.text["*"];
     if (!html) return false;
-
-    // Check if the French section exists in the HTML (e.g., "<h2>Français")
-    const isFrench = html.includes('langue="fr"') || html.includes("Français");
-    return isFrench;
+    return html.includes('langue="fr"') || html.includes("Français");
   } catch (err) {
     console.error("Erreur de validation avec Wiktionary :", err);
     return false;
   }
 }
 
-// Fetch target word from public API
-onMounted(async () => {
+// Fetch word from API
+async function fetchWord(lang) {
   try {
-    let word = "";
-    do {
-      const res = await fetch("https://trouve-mot.fr/api/size/5");
-      const data = await res.json();
-      word = data[0]?.name ?? "";
-    } while (/[À-ÿ]/.test(word)); // Filter words with accents
-
-    targetWord.value = word.toUpperCase();
-    console.log("Mot à deviner :", targetWord.value);
-    initBoard();
+    const url = `https://random-word-api.herokuapp.com/word?lang=${lang}&number=1&length=5`;
+    const res = await fetch(url);
+    const data = await res.json();
+    return data[0]?.toUpperCase() || "";
   } catch (err) {
-    console.error("Erreur lors de la récupération du mot :", err);
+    console.error("Error fetching word:", err);
+    return "";
   }
+}
+
+// Start a new game
+async function initGame() {
+  const lang = localStorage.getItem("wordleLanguage") || "en";
+  currentLanguage.value = lang;
+
+  // Try to restore from saved state
+  if (loadGame()) return;
+
+  let word = "";
+  do {
+    word = await fetchWord(lang);
+  } while (!word || word.length !== 5);
+
+  targetWord.value = word;
+  console.log("Word to guess:", targetWord.value);
+
+  currentInput.value = [];
+  currentAttempt.value = 0;
+  keyStatuses.value = {};
+  initBoard();
+  saveGame(); // Save initial state
+}
+
+// Handle language change
+function handleLanguageChange() {
+  localStorage.removeItem(STORAGE_KEY);
+  initGame();
+}
+
+onMounted(() => {
+  initGame();
+  window.addEventListener("languageChanged", handleLanguageChange);
+});
+
+onUnmounted(() => {
+  window.removeEventListener("languageChanged", handleLanguageChange);
 });
 </script>
 

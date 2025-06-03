@@ -5,9 +5,8 @@
         v-for="key in row"
         :key="key"
         :key-value="key"
-        :status="getStatus(key)"                    
-        @key-press="handleKeyPress"                 
-        :class="{ 'special-key': key === 'ENTER' || key === 'DEL' }"  
+        :status="getStatus(key)"
+        @key-press="handleKeyPress"
       />
     </div>
   </div>

@@ -1,21 +1,28 @@
 <script setup>
+import { computed } from 'vue'
+
 const props = defineProps({
   keyValue: { type: String, required: true },
   status: { type: String, default: 'default' }
 })
 
 defineEmits(['key-press'])
+
+const statusClass = computed(() => {
+  if (props.status === 'green') return 'correct'
+  if (props.status === 'yellow') return 'present'
+  if (props.status === 'gray') return 'absent'
+  return ''
+})
 </script>
 
 <template>
   <button
     class="keyboard-key"
-    :class="[status, { 'enter-key': keyValue === 'ENTER', 'del-key': keyValue === 'DEL' }]" 
+    :class="[statusClass, { 'special-key': keyValue === 'ENTER' || keyValue === 'DEL', 'enter-key': keyValue === 'ENTER', 'del-key': keyValue === 'DEL' }]" 
     @click="$emit('key-press', keyValue)"
   >
-  
-    <span v-if="keyValue === 'DEL'">&#x21A9;</span> <!-- Unicode for the ArrowBack -->
-    <!-- Show normal text for other ones -->
+    <span v-if="keyValue === 'DEL'">&#x21A9;</span>
     <span v-else>{{ keyValue }}</span>
   </button>
 </template>
@@ -34,7 +41,7 @@ defineEmits(['key-press'])
   transition: background-color 0.3s;
 }
 
-/* Change size for ENTER and DEL */
+/* ENTER and DEL sizing */
 .special-key {
   width: 65.41px; 
   height: 58px; 
@@ -42,12 +49,16 @@ defineEmits(['key-press'])
   justify-content: center;
   align-items: center;
 }
-.enter-key{
+
+.enter-key {
   font-size: 15px;
 }
-.del-key{
+
+.del-key {
   font-size: 20px;
 }
+
+/* Match previous appearance */
 .correct {
   background-color: #6aaa64;
 }
