@@ -7,7 +7,6 @@
         :key-value="key"
         :status="getStatus(key)"
         @key-press="handleKeyPress"
-        :class="{ 'special-key': key === 'ENTER' || key === 'DEL' }"
       />
     </div>
   </div>
