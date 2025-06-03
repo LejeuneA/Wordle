@@ -24,6 +24,14 @@ html {
   font-family: var(--font-family);
 }
 
+body {
+  margin: 0;
+  font-family: var(--font-family);
+  background-color: var(--white);
+  color: var(--dark-grey);
+  transition: background-color 0.3s ease;
+}
+
 html,
 body,
 div,

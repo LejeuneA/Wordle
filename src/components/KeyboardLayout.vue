@@ -14,7 +14,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, computed } from 'vue'
+import { onMounted, onUnmounted} from 'vue'
 import KeyboardKey from './KeyboardKey.vue'
 
 const props = defineProps({
