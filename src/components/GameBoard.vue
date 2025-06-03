@@ -189,7 +189,7 @@ async function fetchWord(lang) {
     const url = `https://random-word-api.herokuapp.com/word?lang=${lang}&number=1&length=5`;
     const res = await fetch(url);
     const data = await res.json();
-    return data[0]?.toUpperCase() || "";
+    return removeAccents(data[0]?.toUpperCase() || "");
   } catch (err) {
     console.error("Error fetching word:", err);
     return "";
@@ -233,6 +233,12 @@ onMounted(() => {
 onUnmounted(() => {
   window.removeEventListener("languageChanged", handleLanguageChange);
 });
+
+function removeAccents(str) {
+  return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+}
+
+
 </script>
 
 <style scoped>
