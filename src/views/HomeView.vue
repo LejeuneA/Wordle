@@ -23,6 +23,21 @@ import Button from "@/components/Button.vue";
 </script>
 
 <style scoped>
+/* Add these dark mode styles */
+.dark .hero-section {
+  background-image: url("/images/word-background-dark.jpg");
+}
+
+.dark .content-box {
+  background-color: var(--white);
+  color: var(--dark-grey);
+}
+
+.dark h1,
+.dark p {
+  color: var(--dark-grey);
+}
+
 .home-view {
   height: 100vh;
   display: flex;
@@ -31,7 +46,7 @@ import Button from "@/components/Button.vue";
 
 .hero-section {
   flex: 1;
-  background-image: url("/images/word-background.jpg");
+  background-image: url("/images/word-background-light.jpg");
   background-size: cover;
   background-position: center;
   display: flex;
@@ -41,7 +56,7 @@ import Button from "@/components/Button.vue";
 }
 
 .content-box {
-  background-color: white;
+  background-color: var(--dark-grey);
   width: 30rem;
   height: 30rem;
   border-radius: 20px;
@@ -61,7 +76,7 @@ import Button from "@/components/Button.vue";
 h1 {
   font-family: var(--font-family);
   font-size: 3.5rem;
-  color: var(--dark-grey);
+  color: var(--white);
   margin-bottom: 20px;
   font-weight: 800;
 }
@@ -69,7 +84,7 @@ h1 {
 p {
   font-family: var(--font-family);
   font-size: 1.2rem;
-  color: var(--dark-grey);
+  color: var(--white);
   margin-bottom: 40px;
   text-align: center;
 }
