@@ -18,7 +18,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from "vue";
+import { ref, onMounted, onUnmounted } from "vue";
 import Word from "./Word.vue";
 import Keyboard from "./KeyboardLayout.vue";
 
@@ -28,6 +28,7 @@ const currentAttempt = ref(0);
 const currentInput = ref([]);
 const targetWord = ref("");
 const keyStatuses = ref({});
+const currentLanguage = ref("en");
 
 // Setup empty board
 function initBoard() {
@@ -69,11 +70,17 @@ async function submitWord() {
 
   const guess = currentInput.value.join("");
 
-  // Validate with Wiktionary API
-  const isValid = await validateFrenchWord(guess);
-  if (!isValid) {
-    alert("Ce mot n'existe pas dans le dictionnaire.");
-    return;
+  // For French, we still validate with Wiktionary
+  if (currentLanguage.value === "fr") {
+    const isValid = await validateFrenchWord(guess);
+    if (!isValid) {
+      alert(
+        currentLanguage.value === "fr"
+          ? "Ce mot n'existe pas dans le dictionnaire."
+          : "This word doesn't exist in the dictionary."
+      );
+      return;
+    }
   }
 
   const statuses = Array(5).fill("gray");
@@ -111,16 +118,24 @@ async function submitWord() {
   words.value[currentAttempt.value].statuses = statuses;
 
   if (guess === targetWord.value) {
-    alert("Bravo ! Vous avez trouvé le mot.");
+    alert(
+      currentLanguage.value === "fr"
+        ? "Bravo ! Vous avez trouvé le mot."
+        : "Congratulations! You found the word."
+    );
   } else if (currentAttempt.value < 5) {
     currentAttempt.value++;
     currentInput.value = [];
   } else {
-    alert(`Dommage ! Le mot était : ${targetWord.value}`);
+    alert(
+      currentLanguage.value === "fr"
+        ? `Dommage ! Le mot était : ${targetWord.value}`
+        : `Too bad! The word was: ${targetWord.value}`
+    );
   }
 }
 
-// Validate word existence with Wiktionary API
+// Validate word existence with Wiktionary API (only for French)
 async function validateFrenchWord(word) {
   const url = `https://fr.wiktionary.org/w/api.php?action=parse&page=${word.toLowerCase()}&prop=text&format=json&origin=*`;
   try {
@@ -130,7 +145,6 @@ async function validateFrenchWord(word) {
     const html = data.parse?.text["*"];
     if (!html) return false;
 
-    // Check if the French section exists in the HTML (e.g., "<h2>Français")
     const isFrench = html.includes('langue="fr"') || html.includes("Français");
     return isFrench;
   } catch (err) {
@@ -139,22 +153,53 @@ async function validateFrenchWord(word) {
   }
 }
 
-// Fetch target word from public API
-onMounted(async () => {
+// Fetch target word from new API
+async function fetchWord(lang) {
   try {
-    let word = "";
-    do {
-      const res = await fetch("https://trouve-mot.fr/api/size/5");
-      const data = await res.json();
-      word = data[0]?.name ?? "";
-    } while (/[À-ÿ]/.test(word)); // Filter words with accents
+    const url = `https://random-word-api.herokuapp.com/word?lang=${lang}&number=1&length=5`;
+    const res = await fetch(url);
+    const data = await res.json();
 
-    targetWord.value = word.toUpperCase();
-    console.log("Mot à deviner :", targetWord.value);
-    initBoard();
+    if (data && data.length > 0) {
+      return data[0].toUpperCase();
+    }
+    return "";
   } catch (err) {
-    console.error("Erreur lors de la récupération du mot :", err);
+    console.error("Error fetching word:", err);
+    return "";
   }
+}
+
+// Initialize game
+async function initGame() {
+  const lang = localStorage.getItem("wordleLanguage") || "en";
+  currentLanguage.value = lang;
+
+  let word = "";
+  do {
+    word = await fetchWord(lang);
+  } while (!word || word.length !== 5);
+
+  targetWord.value = word;
+  console.log("Word to guess:", targetWord.value);
+  initBoard();
+}
+
+// Handle language changes
+function handleLanguageChange() {
+  initGame();
+  currentAttempt.value = 0;
+  currentInput.value = [];
+  keyStatuses.value = {};
+}
+
+onMounted(() => {
+  initGame();
+  window.addEventListener("languageChanged", handleLanguageChange);
+});
+
+onUnmounted(() => {
+  window.removeEventListener("languageChanged", handleLanguageChange);
 });
 </script>
 

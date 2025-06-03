@@ -6,6 +6,18 @@
         <span>WORDLE</span>
       </router-link>
       <div class="nav-right">
+        <select
+          v-model="selectedLanguage"
+          @change="changeLanguage"
+          class="language-select"
+        >
+          <option value="en">English</option>
+          <option value="fr">Français</option>
+          <option value="es">Español</option>
+          <option value="it">Italiano</option>
+          <option value="de">Deutsch</option>
+        </select>
+
         <button @click="toggleDarkMode" class="theme-toggle">
           <svg
             v-if="isDarkMode"
@@ -69,13 +81,19 @@
 import { ref, onMounted } from "vue";
 
 const isDarkMode = ref(false);
+const selectedLanguage = ref("en");
 
-// Load saved preference
+// Load saved preferences
 onMounted(() => {
   const savedMode = localStorage.getItem("darkMode");
   if (savedMode) {
     isDarkMode.value = savedMode === "true";
     updateTheme();
+  }
+
+  const savedLang = localStorage.getItem("wordleLanguage");
+  if (savedLang) {
+    selectedLanguage.value = savedLang;
   }
 });
 
@@ -84,6 +102,12 @@ const toggleDarkMode = () => {
   isDarkMode.value = !isDarkMode.value;
   localStorage.setItem("darkMode", isDarkMode.value);
   updateTheme();
+};
+
+// Change language function
+const changeLanguage = () => {
+  localStorage.setItem("wordleLanguage", selectedLanguage.value);
+  window.dispatchEvent(new Event("languageChanged"));
 };
 
 // Apply theme changes
@@ -182,5 +206,25 @@ const updateTheme = () => {
 
 .home-link svg {
   display: block;
+}
+
+.language-select {
+  padding: 0.5rem 0.8rem;
+  border-radius: 4px;
+  border: 1px solid var(--light-grey);
+  background-color: var(--dark-grey);
+  color: var(--white);
+  font-family: var(--font-family);
+  cursor: pointer;
+}
+
+.language-select:focus {
+  outline: none;
+  border-color: var(--orange);
+}
+
+.dark .language-select {
+  background-color: var(--white);
+  color: var(--dark-grey);
 }
 </style>
