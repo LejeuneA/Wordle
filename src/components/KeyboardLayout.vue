@@ -1,8 +1,27 @@
+<template>
+  <div class="keyboard-layout">
+    <div v-for="(row, i) in rows" :key="i" class="keyboard-row">
+      <KeyboardKey
+        v-for="key in row"
+        :key="key"
+        :key-value="key"
+        :status="getStatus(key)"
+        @key-press="handleKeyPress"
+        :class="{ 'special-key': key === 'ENTER' || key === 'DEL' }"
+      />
+    </div>
+  </div>
+</template>
+
 <script setup>
-import { onMounted, onUnmounted } from 'vue'
+import { onMounted, onUnmounted} from 'vue'
 import KeyboardKey from './KeyboardKey.vue'
 
-const emit = defineEmits(['key-press'])
+const props = defineProps({
+  keyStatuses: { type: Object, default: () => ({}) }
+})
+
+const emit = defineEmits(['keyPress', 'submitWord', 'deleteLetter'])
 
 const rows = [
   'AZERTYUIOP'.split(''),
@@ -10,16 +29,17 @@ const rows = [
   ['ENTER', 'W', 'X', 'C', 'V', 'B', 'N', 'DEL']
 ]
 
-const props = defineProps({
-  keyStatuses: { type: Object, default: () => ({}) }
-})
-
-const getStatus = (letter) => {
-  return props.keyStatuses[letter] || 'default'
-}
+// Get key status from prop or fallback
+const getStatus = (letter) => props.keyStatuses[letter] || 'default'
 
 const handleKeyPress = (key) => {
-  emit('key-press', key)
+  if (key === 'ENTER') {
+    emit('submitWord')
+  } else if (key === 'DEL') {
+    emit('deleteLetter')
+  } else {
+    emit('keyPress', key)
+  }
 }
 
 const onKeyDown = (event) => {
@@ -29,6 +49,18 @@ const onKeyDown = (event) => {
   }
 }
 
-onMounted(() => window.addEventListener('keydown', onKeyDown))
-onUnmounted(() => window.removeEventListener('keydown', onKeyDown))
+onMounted(() => {
+  window.addEventListener('keydown', onKeyDown)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', onKeyDown)
+})
 </script>
+
+<style scoped>
+.keyboard-row {
+  display: flex;
+  justify-content: center;
+}
+</style>
