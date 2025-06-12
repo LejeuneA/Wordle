@@ -1,12 +1,20 @@
 <template>
   <div class="game-board-wrapper">
     <div class="game-board">
+      <!-- Toggle between normal and hard mode -->
+      <button @click="toggleGameMode" class="toggle-mode">
+        {{ isHardMode ? "Switch to Normal Mode" : "Switch to Hard Mode" }}
+      </button>
+
+      <!-- Render the words already attempted -->
       <Word
         v-for="(word, index) in words"
         :key="index"
         :letters="word.letters"
         :statuses="word.statuses"
       />
+
+      <!-- Keyboard input component -->
       <Keyboard
         :keyStatuses="keyStatuses"
         @keyPress="handleKeyPress"
@@ -18,39 +26,52 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, watch } from "vue";
+import { ref, onMounted, onUnmounted, watch, computed } from "vue";
 import Word from "./Word.vue";
 import Keyboard from "./KeyboardLayout.vue";
 
 const words = ref([]);
 const currentAttempt = ref(0);
 const currentInput = ref([]);
-const targetWord = ref("");          // Without accents, used for game logic
-const targetWordAccented = ref("");  // With accents, used for validation
+const targetWord = ref("");           // Game logic (no accents)
+const targetWordRaw = ref("");         // Original word (possibly with accents)
 const keyStatuses = ref({});
 const currentLanguage = ref("en");
+const isHardMode = ref(localStorage.getItem("wordleMode") === "hard");
 
-// Utility function to remove accents from a string
+// Dynamic word length and max attempts based on mode
+const wordLength = computed(() => isHardMode.value ? 7 : 5);
+const maxAttempts = computed(() => isHardMode.value ? 5 : 6);
+
+// Fallback words in case API fails
+const fallbackWords = {
+  en: {
+    easy: ["PLANT", "BRICK", "CLOUD"],
+    hard: ["BALLOON", "MUSEUMS", "WEALTHY"]
+  },
+  fr: {
+    easy: ["JOUER", "BLEUE", "PHOTO"],
+    hard: ["JARDINS", "DESSINS", "SOYEUSE"]
+  }
+};
+
 function removeAccents(str) {
-  return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  return str.normalize("NFD").replace(/[̀-ͯ]/g, "");
 }
 
-// Watch relevant state to save the game in localStorage
-watch([words, currentAttempt, currentInput, keyStatuses, targetWord], saveGame, {
+watch([words, currentAttempt, currentInput, keyStatuses, targetWord, isHardMode], saveGame, {
   deep: true,
 });
 
 const STORAGE_KEY = "wordleGameState";
 
-// Initialize the game board
 function initBoard() {
-  words.value = Array.from({ length: 6 }, () => ({
-    letters: Array(5).fill(""),
-    statuses: Array(5).fill(""),
+  words.value = Array.from({ length: maxAttempts.value }, () => ({
+    letters: Array(wordLength.value).fill(""),
+    statuses: Array(wordLength.value).fill("")
   }));
 }
 
-// Save game state to localStorage
 function saveGame() {
   const state = {
     words: words.value,
@@ -58,28 +79,29 @@ function saveGame() {
     currentInput: currentInput.value,
     keyStatuses: keyStatuses.value,
     targetWord: targetWord.value,
-    targetWordAccented: targetWordAccented.value,
+    targetWordRaw: targetWordRaw.value,
     language: currentLanguage.value,
+    isHardMode: isHardMode.value
   };
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
 }
 
-// Load game state from localStorage
 function loadGame() {
   const saved = localStorage.getItem(STORAGE_KEY);
   if (saved) {
     try {
       const state = JSON.parse(saved);
-      if (state.targetWord && state.targetWord.length === 5) {
+      if (state.targetWord && state.targetWord.length === wordLength.value) {
         words.value = state.words || [];
         currentAttempt.value = state.currentAttempt || 0;
         currentInput.value = state.currentInput || [];
         keyStatuses.value = state.keyStatuses || {};
         targetWord.value = state.targetWord;
-        targetWordAccented.value = state.targetWordAccented || targetWord.value;
+        targetWordRaw.value = state.targetWordRaw || state.targetWord;
         currentLanguage.value = state.language || "en";
+        isHardMode.value = state.isHardMode || false;
         updateBoard();
-        console.log("Resumed word:", targetWordAccented.value);
+        console.log("Resumed word:", targetWordRaw.value);
         return true;
       }
     } catch (err) {
@@ -89,16 +111,14 @@ function loadGame() {
   return false;
 }
 
-// Handle key press for letters
 function handleKeyPress(key) {
   if (!/^[A-Z]$/.test(key)) return;
-  if (currentInput.value.length < 5 && currentAttempt.value < 6) {
+  if (currentInput.value.length < wordLength.value && currentAttempt.value < maxAttempts.value) {
     currentInput.value.push(key);
     updateBoard();
   }
 }
 
-// Delete last letter entered
 function deleteLetter() {
   if (currentInput.value.length > 0) {
     currentInput.value.pop();
@@ -106,66 +126,21 @@ function deleteLetter() {
   }
 }
 
-// Update the board's current attempt with the current input letters
 function updateBoard() {
   const attempt = words.value[currentAttempt.value];
-  attempt.letters = [
-    ...currentInput.value,
-    ...Array(5 - currentInput.value.length).fill(""),
-  ];
+  attempt.letters = [...currentInput.value, ...Array(wordLength.value - currentInput.value.length).fill("")];
 }
 
-// Validate a French word using Wiktionary
-// Tries first with accented word, then without accents if not found
-async function validateFrenchWord(word) {
-  // Internal function to check Wiktionary for a given word
-  async function checkWord(w) {
-    const url = `https://fr.wiktionary.org/w/api.php?action=parse&page=${w.toLowerCase()}&prop=text&format=json&origin=*`;
-    try {
-      const res = await fetch(url);
-      const data = await res.json();
-      const html = data.parse?.text["*"];
-      if (!html) return false;
-      return html.includes('langue="fr"') || html.includes("Français");
-    } catch (err) {
-      console.error("Validation error with Wiktionary:", err);
-      return false;
-    }
-  }
-
-  // Try accented version first
-  let valid = await checkWord(word);
-  if (valid) return true;
-
-  // If not valid, try without accents
-  const noAccentWord = removeAccents(word);
-  if (noAccentWord !== word) {
-    valid = await checkWord(noAccentWord);
-  }
-
-  return valid;
-}
-
-// Submit the current guess, validate and update the game state
 async function submitWord() {
-  if (currentInput.value.length !== 5) return;
+  if (currentInput.value.length !== wordLength.value) return;
 
   const guess = currentInput.value.join("");
-
-  if (currentLanguage.value === "fr") {
-    const isValid = await validateFrenchWord(guess);
-    if (!isValid) {
-      alert("This word does not exist in the dictionary.");
-      return;
-    }
-  }
-
-  const statuses = Array(5).fill("gray");
+  const statuses = Array(wordLength.value).fill("gray");
   const targetArray = targetWord.value.split("");
-  const used = Array(5).fill(false);
+  const used = Array(wordLength.value).fill(false);
 
-  // First pass - green (correct letter and position)
-  for (let i = 0; i < 5; i++) {
+  // Green pass
+  for (let i = 0; i < wordLength.value; i++) {
     if (guess[i] === targetArray[i]) {
       statuses[i] = "green";
       used[i] = true;
@@ -173,12 +148,10 @@ async function submitWord() {
     }
   }
 
-  // Second pass - yellow (correct letter, wrong position)
-  for (let i = 0; i < 5; i++) {
+  // Yellow pass
+  for (let i = 0; i < wordLength.value; i++) {
     if (statuses[i] === "green") continue;
-    const index = targetArray.findIndex(
-      (c, idx) => c === guess[i] && !used[idx]
-    );
+    const index = targetArray.findIndex((c, idx) => c === guess[i] && !used[idx]);
     if (index !== -1) {
       statuses[i] = "yellow";
       used[index] = true;
@@ -196,41 +169,41 @@ async function submitWord() {
 
   if (guess === targetWord.value) {
     alert("Congratulations! You found the word.");
-  } else if (currentAttempt.value < 5) {
+  } else if (currentAttempt.value < maxAttempts.value - 1) {
     currentAttempt.value++;
     currentInput.value = [];
   } else {
-    alert(`Too bad! The word was: ${targetWordAccented.value}`);
+    alert(`Too bad! The word was: ${targetWordRaw.value}`);
   }
 }
 
-// Fetch a random 5-letter word for the chosen language
 async function fetchWord(lang) {
   try {
-    const url = `https://random-word-api.herokuapp.com/word?lang=${lang}&number=1&length=5`;
+    const url = `https://random-word-api.herokuapp.com/word?lang=${lang}&number=1&length=${wordLength.value}`;
     const res = await fetch(url);
     const data = await res.json();
     return data[0]?.toUpperCase() || "";
   } catch (err) {
     console.error("Error fetching word:", err);
-    return "";
+    const list = fallbackWords[lang]?.[isHardMode.value ? "hard" : "easy"] || fallbackWords["en"].easy;
+    return list[Math.floor(Math.random() * list.length)].toUpperCase();
   }
 }
 
-// Initialize a new game or restore from localStorage
 async function initGame() {
   const lang = localStorage.getItem("wordleLanguage") || "en";
   currentLanguage.value = lang;
 
   if (loadGame()) return;
 
-  let wordAccented = "";
+  let raw = "";
   do {
-    wordAccented = await fetchWord(lang);
-  } while (!wordAccented || wordAccented.length !== 5);
+    raw = await fetchWord(lang);
+  } while (!raw || raw.length !== wordLength.value);
 
-  targetWordAccented.value = wordAccented.toUpperCase();
-  targetWord.value = removeAccents(targetWordAccented.value);
+  targetWordRaw.value = raw;
+  targetWord.value = removeAccents(raw);
+  console.log("New word:", targetWordRaw.value);
 
   currentInput.value = [];
   currentAttempt.value = 0;
@@ -239,10 +212,15 @@ async function initGame() {
   saveGame();
 }
 
-// Handle language change event, reset game
 function handleLanguageChange() {
   localStorage.removeItem(STORAGE_KEY);
   initGame();
+}
+
+function toggleGameMode() {
+  isHardMode.value = !isHardMode.value;
+  localStorage.setItem("wordleMode", isHardMode.value ? "hard" : "normal");
+  handleLanguageChange();
 }
 
 onMounted(() => {
@@ -254,7 +232,6 @@ onUnmounted(() => {
   window.removeEventListener("languageChanged", handleLanguageChange);
 });
 </script>
-
 
 <style scoped>
 .game-board-wrapper {
@@ -284,7 +261,21 @@ onUnmounted(() => {
   transition: background-color 0.3s ease, color 0.3s ease;
 }
 
-/* Dark mode styles */
+.toggle-mode {
+  margin-bottom: 1rem;
+  padding: 0.5rem 1rem;
+  background-color: #444;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: background-color 0.3s;
+}
+.toggle-mode:hover {
+  background-color: #666;
+}
+
 .dark .game-board-wrapper {
   background-image: url("/images/word-background-dark.jpg");
   color: var(--white);
