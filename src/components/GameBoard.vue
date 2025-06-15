@@ -6,7 +6,7 @@
         {{ isHardMode ? "Switch to Normal Mode" : "Switch to Hard Mode" }}
       </button>
 
-      <!-- Render the words already attempted -->
+      <!-- Render the words already attempted-->
       <Word
         v-for="(word, index) in words"
         :key="index"
@@ -181,6 +181,7 @@ function removeAccents(str) {
   return str.normalize("NFD").replace(/[̀-ͯ]/g, "");
 }
 
+// Watches for changes in reactive data and triggers action. When any watched value changes, calls saveGame() function
 watch(
   [words, currentAttempt, currentInput, keyStatuses, targetWord, isHardMode],
   saveGame,
@@ -326,23 +327,31 @@ async function fetchWord(lang) {
   }
 }
 
+// Loads or creates a new game. Gets current language from localStorage (defaults to English)
 async function initGame() {
   const lang = localStorage.getItem("wordleLanguage") || "en";
   currentLanguage.value = lang;
 
+  // Tries to load saved game (returns if successful)
   if (loadGame()) return;
 
+  // Fetches a new word of correct length from API (with fallback)
   let raw = "";
   do {
     raw = await fetchWord(lang);
   } while (!raw || raw.length !== wordLength.value);
 
+  // Stores original and processed word
   targetWordRaw.value = raw;
+  // Stores accent-free version
   targetWord.value = removeAccents(raw);
   console.log("New word:", targetWordRaw.value);
 
+  // Clears current input
   currentInput.value = [];
+  // Resets attempt counter
   currentAttempt.value = 0;
+  // Clears keyboard statuses
   keyStatuses.value = {};
   initBoard();
   saveGame();
@@ -359,11 +368,13 @@ function toggleGameMode() {
   handleLanguageChange();
 }
 
+// When the page loads for the first time loads or creates a new game and it calls handleLanguageChange
 onMounted(() => {
   initGame();
   window.addEventListener("languageChanged", handleLanguageChange);
 });
 
+// When navigating away from the game page removes the event listener to prevent memory leaks
 onUnmounted(() => {
   window.removeEventListener("languageChanged", handleLanguageChange);
 });
