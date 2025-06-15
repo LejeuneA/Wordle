@@ -22,6 +22,7 @@
 import Button from "@/components/Button.vue";
 import { ref, onMounted } from "vue";
 
+// Takes an inner value and returns a reactive ref object, which has a single property
 const currentLanguage = ref(localStorage.getItem("wordleLanguage") || "en");
 
 const translations = {
