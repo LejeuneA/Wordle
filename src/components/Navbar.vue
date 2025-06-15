@@ -81,7 +81,7 @@
 import { ref, onMounted } from "vue";
 
 const isDarkMode = ref(false);
-const selectedLanguage = ref("en");
+const selectedLanguage = ref(localStorage.getItem("wordleLanguage") || "en");
 
 // Load saved preferences
 onMounted(() => {
@@ -107,7 +107,11 @@ const toggleDarkMode = () => {
 // Change language function
 const changeLanguage = () => {
   localStorage.setItem("wordleLanguage", selectedLanguage.value);
-  window.dispatchEvent(new Event("languageChanged"));
+  window.dispatchEvent(
+    new CustomEvent("languageChanged", {
+      detail: { language: selectedLanguage.value },
+    })
+  );
 };
 
 // Apply theme changes
@@ -121,47 +125,6 @@ const updateTheme = () => {
 </script>
 
 <style scoped>
-.navbar {
-  background-color: var(--white);
-  padding: 1rem 2rem;
-  border-bottom: 1px solid var(--light-grey);
-}
-
-/* Dark mode styles */
-.dark .navbar {
-  background-color: var(--white);
-  border-bottom-color: var(--dark-grey);
-}
-
-.dark .logo,
-.dark .home-link {
-  color: var(--dark-grey);
-}
-
-.nav-right {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-}
-
-.theme-toggle {
-  background: none;
-  border: none;
-  cursor: pointer;
-  color: var(--white);
-  padding: 0.5rem;
-  display: flex;
-  align-items: center;
-}
-
-.dark .theme-toggle {
-  color: var(--dark-grey);
-}
-
-.theme-toggle:hover {
-  color: var(--orange);
-}
-
 .navbar {
   background-color: var(--dark-grey);
   padding: 1rem 2rem;
@@ -184,14 +147,34 @@ const updateTheme = () => {
   text-decoration: none;
   display: flex;
   align-items: center;
+}
 
-  img {
-    width: 30px;
-    margin-right: 10px;
-  }
+.logo img {
+  width: 30px;
+  margin-right: 10px;
 }
 
 .logo:hover {
+  color: var(--orange);
+}
+
+.nav-right {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.theme-toggle {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--white);
+  padding: 0.5rem;
+  display: flex;
+  align-items: center;
+}
+
+.theme-toggle:hover {
   color: var(--orange);
 }
 
@@ -221,6 +204,21 @@ const updateTheme = () => {
 .language-select:focus {
   outline: none;
   border-color: var(--orange);
+}
+
+/* Dark mode styles */
+.dark .navbar {
+  background-color: var(--white);
+  border-bottom-color: var(--dark-grey);
+}
+
+.dark .logo,
+.dark .home-link {
+  color: var(--dark-grey);
+}
+
+.dark .theme-toggle {
+  color: var(--dark-grey);
 }
 
 .dark .language-select {

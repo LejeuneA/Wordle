@@ -3,15 +3,15 @@
     <div class="hero-section">
       <div class="content-box">
         <img src="/images/wordle-logo.png" class="logo" />
-        <h1>Wordle</h1>
-        <p>Vous avez 6 chances de deviner un mot de 5 lettres.</p>
+        <h1>{{ translations[currentLanguage]?.title || "Wordle" }}</h1>
+        <p>{{ translations[currentLanguage]?.description }}</p>
 
         <Button
           size="medium"
           customClass="primary"
           @click="$router.push('/game')"
         >
-          Jouer
+          {{ translations[currentLanguage]?.playButton }}
         </Button>
       </div>
     </div>
@@ -20,24 +20,46 @@
 
 <script setup>
 import Button from "@/components/Button.vue";
+import { ref, onMounted } from "vue";
+
+const currentLanguage = ref(localStorage.getItem("wordleLanguage") || "en");
+
+const translations = {
+  en: {
+    title: "Wordle",
+    description: "You have 6 chances to guess a 5-letter word.",
+    playButton: "Play",
+  },
+  fr: {
+    title: "Wordle",
+    description: "Vous avez 6 chances de deviner un mot de 5 lettres.",
+    playButton: "Jouer",
+  },
+  es: {
+    title: "Wordle",
+    description: "Tienes 6 intentos para adivinar una palabra de 5 letras.",
+    playButton: "Jugar",
+  },
+  it: {
+    title: "Wordle",
+    description: "Hai 6 tentativi per indovinare una parola di 5 lettere.",
+    playButton: "Gioca",
+  },
+  de: {
+    title: "Wordle",
+    description: "Sie haben 6 Versuche, ein 5-Buchstaben-Wort zu erraten.",
+    playButton: "Spielen",
+  },
+};
+
+onMounted(() => {
+  window.addEventListener("languageChanged", (event) => {
+    currentLanguage.value = event.detail?.language || "en";
+  });
+});
 </script>
 
 <style scoped>
-/* Add these dark mode styles */
-.dark .hero-section {
-  background-image: url("/images/word-background-dark.jpg");
-}
-
-.dark .content-box {
-  background-color: var(--white);
-  color: var(--dark-grey);
-}
-
-.dark h1,
-.dark p {
-  color: var(--dark-grey);
-}
-
 .home-view {
   height: 100vh;
   display: flex;
@@ -89,5 +111,20 @@ p {
   color: var(--white);
   margin-bottom: 40px;
   text-align: center;
+}
+
+/* Dark mode styles */
+.dark .hero-section {
+  background-image: url("/images/word-background-dark.jpg");
+}
+
+.dark .content-box {
+  background-color: var(--white);
+  color: var(--dark-grey);
+}
+
+.dark h1,
+.dark p {
+  color: var(--dark-grey);
 }
 </style>

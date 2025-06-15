@@ -33,42 +33,168 @@ import Keyboard from "./KeyboardLayout.vue";
 const words = ref([]);
 const currentAttempt = ref(0);
 const currentInput = ref([]);
-const targetWord = ref("");           // Game logic (no accents)
-const targetWordRaw = ref("");         // Original word (possibly with accents)
+const targetWord = ref(""); // Game logic (no accents)
+const targetWordRaw = ref(""); // Original word (possibly with accents)
 const keyStatuses = ref({});
 const currentLanguage = ref("en");
 const isHardMode = ref(localStorage.getItem("wordleMode") === "hard");
 
 // Dynamic word length and max attempts based on mode
-const wordLength = computed(() => isHardMode.value ? 7 : 5);
-const maxAttempts = computed(() => isHardMode.value ? 5 : 6);
+const wordLength = computed(() => (isHardMode.value ? 7 : 5));
+const maxAttempts = computed(() => (isHardMode.value ? 5 : 6));
 
 // Fallback words in case API fails
 const fallbackWords = {
   en: {
-    easy: ["PLANT", "BRICK", "CLOUD"],
-    hard: ["BALLOON", "MUSEUMS", "WEALTHY"]
+    easy: [
+      "APPLE",
+      "BEACH",
+      "CHAIR",
+      "DANCE",
+      "EARTH",
+      "FRUIT",
+      "GRASS",
+      "HOUSE",
+      "JUICE",
+      "LIGHT",
+    ],
+    hard: [
+      "BALLOON",
+      "CAPTAIN",
+      "DIAMOND",
+      "ELEGANT",
+      "FREEDOM",
+      "GALLERY",
+      "HARMONY",
+      "JOURNEY",
+      "KITCHEN",
+      "LIBRARY",
+    ],
   },
   fr: {
-    easy: ["JOUER", "BLEUE", "PHOTO"],
-    hard: ["JARDINS", "DESSINS", "SOYEUSE"]
-  }
+    easy: [
+      "ARBRE",
+      "BLEUE",
+      "CHAIR",
+      "DINER",
+      "ÉTAGE",
+      "FLEUR",
+      "GOÛTER",
+      "HIVER",
+      "JOUER",
+      "LUMIÈRE",
+    ],
+    hard: [
+      "JARDINS",
+      "KILOMÈTRE",
+      "LUMINEUX",
+      "MAGNIFIQUE",
+      "NATUREL",
+      "OPÉRATION",
+      "PARFAIT",
+      "QUESTION",
+      "RÉALITÉ",
+      "SÉCURITÉ",
+    ],
+  },
+  es: {
+    easy: [
+      "AGUA",
+      "BARCO",
+      "CIELO",
+      "DULCE",
+      "ESCUELA",
+      "FLOR",
+      "GATO",
+      "HOJA",
+      "IGUAL",
+      "JUGAR",
+    ],
+    hard: [
+      "AMISTAD",
+      "BICICLETA",
+      "CREATIVO",
+      "DESCUBRIR",
+      "ESPERANZA",
+      "FELICIDAD",
+      "GENEROSO",
+      "HONESTIDAD",
+      "IMAGINAR",
+      "JUBILACIÓN",
+    ],
+  },
+  it: {
+    easy: [
+      "ACQUA",
+      "BAMBINO",
+      "CANE",
+      "DOLCE",
+      "EUROPA",
+      "FIORE",
+      "GATTO",
+      "HOTEL",
+      "ISOLA",
+      "LIBRO",
+    ],
+    hard: [
+      "ARMONIA",
+      "BELLEZZA",
+      "CIVILTÀ",
+      "DOLCEZZA",
+      "ELEGANZA",
+      "FANTASIA",
+      "GENEROSO",
+      "IMMAGINE",
+      "LEGGEREZZA",
+      "MERAVIGLIA",
+    ],
+  },
+  de: {
+    easy: [
+      "APFEL",
+      "BLUME",
+      "CHAIR",
+      "DANK",
+      "ESSEN",
+      "FREUND",
+      "GARTEN",
+      "HAUS",
+      "IGEL",
+      "JAHR",
+    ],
+    hard: [
+      "ABENTEUER",
+      "BESCHREIBEN",
+      "CHAMPAGNER",
+      "DOKUMENT",
+      "ERFINDUNG",
+      "FREIHEIT",
+      "GEDICHT",
+      "HANDWERK",
+      "IDEALIST",
+      "JOURNALIST",
+    ],
+  },
 };
 
 function removeAccents(str) {
   return str.normalize("NFD").replace(/[̀-ͯ]/g, "");
 }
 
-watch([words, currentAttempt, currentInput, keyStatuses, targetWord, isHardMode], saveGame, {
-  deep: true,
-});
+watch(
+  [words, currentAttempt, currentInput, keyStatuses, targetWord, isHardMode],
+  saveGame,
+  {
+    deep: true,
+  }
+);
 
 const STORAGE_KEY = "wordleGameState";
 
 function initBoard() {
   words.value = Array.from({ length: maxAttempts.value }, () => ({
     letters: Array(wordLength.value).fill(""),
-    statuses: Array(wordLength.value).fill("")
+    statuses: Array(wordLength.value).fill(""),
   }));
 }
 
@@ -81,7 +207,7 @@ function saveGame() {
     targetWord: targetWord.value,
     targetWordRaw: targetWordRaw.value,
     language: currentLanguage.value,
-    isHardMode: isHardMode.value
+    isHardMode: isHardMode.value,
   };
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
 }
@@ -113,7 +239,10 @@ function loadGame() {
 
 function handleKeyPress(key) {
   if (!/^[A-Z]$/.test(key)) return;
-  if (currentInput.value.length < wordLength.value && currentAttempt.value < maxAttempts.value) {
+  if (
+    currentInput.value.length < wordLength.value &&
+    currentAttempt.value < maxAttempts.value
+  ) {
     currentInput.value.push(key);
     updateBoard();
   }
@@ -128,7 +257,10 @@ function deleteLetter() {
 
 function updateBoard() {
   const attempt = words.value[currentAttempt.value];
-  attempt.letters = [...currentInput.value, ...Array(wordLength.value - currentInput.value.length).fill("")];
+  attempt.letters = [
+    ...currentInput.value,
+    ...Array(wordLength.value - currentInput.value.length).fill(""),
+  ];
 }
 
 async function submitWord() {
@@ -151,7 +283,9 @@ async function submitWord() {
   // Yellow pass
   for (let i = 0; i < wordLength.value; i++) {
     if (statuses[i] === "green") continue;
-    const index = targetArray.findIndex((c, idx) => c === guess[i] && !used[idx]);
+    const index = targetArray.findIndex(
+      (c, idx) => c === guess[i] && !used[idx]
+    );
     if (index !== -1) {
       statuses[i] = "yellow";
       used[index] = true;
@@ -185,7 +319,9 @@ async function fetchWord(lang) {
     return data[0]?.toUpperCase() || "";
   } catch (err) {
     console.error("Error fetching word:", err);
-    const list = fallbackWords[lang]?.[isHardMode.value ? "hard" : "easy"] || fallbackWords["en"].easy;
+    const list =
+      fallbackWords[lang]?.[isHardMode.value ? "hard" : "easy"] ||
+      fallbackWords["en"].easy;
     return list[Math.floor(Math.random() * list.length)].toUpperCase();
   }
 }
