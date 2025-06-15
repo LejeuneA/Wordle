@@ -83,6 +83,7 @@
 import { ref, onMounted } from "vue";
 
 const isDarkMode = ref(false);
+// Takes an inner value from changeLanguage() and returns a reactive ref object, which has a single property
 const selectedLanguage = ref(localStorage.getItem("wordleLanguage") || "en");
 
 // Load saved preferences from localStorage when the app starts
@@ -106,7 +107,7 @@ const toggleDarkMode = () => {
   updateTheme();
 };
 
-// Change language function
+// Change language function. Triggered when the language dropdown changes
 const changeLanguage = () => {
   localStorage.setItem("wordleLanguage", selectedLanguage.value);
   window.dispatchEvent(
