@@ -1,11 +1,13 @@
 <template>
   <nav class="navbar">
     <div class="navbar-content">
+      <!-- When clicked, it navigates to the root path ("/") without a full page reload -->
       <router-link to="/" class="logo">
         <img src="/images/wordle-logo.png" alt="wordle-logo" />
         <span>WORDLE</span>
       </router-link>
       <div class="nav-right">
+        <!-- When user selects an option, selectedLanguage updates automatically -->
         <select
           v-model="selectedLanguage"
           @change="changeLanguage"
@@ -83,7 +85,7 @@ import { ref, onMounted } from "vue";
 const isDarkMode = ref(false);
 const selectedLanguage = ref(localStorage.getItem("wordleLanguage") || "en");
 
-// Load saved preferences
+// Load saved preferences from localStorage when the app starts
 onMounted(() => {
   const savedMode = localStorage.getItem("darkMode");
   if (savedMode) {
@@ -114,7 +116,7 @@ const changeLanguage = () => {
   );
 };
 
-// Apply theme changes
+// Apply theme changes (Adds and removes the "dark" class to the <html> element)
 const updateTheme = () => {
   if (isDarkMode.value) {
     document.documentElement.classList.add("dark");
