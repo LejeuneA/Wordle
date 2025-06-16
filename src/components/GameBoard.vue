@@ -405,34 +405,68 @@ async function submitWord() {
 
   const guess = currentInput.value.join("");
 
-  // Validate French words
+  // Special handling for French words
   if (currentLanguage.value === "fr") {
-    const isValid = await validateFrenchWord(guess);
-    if (!isValid) {
-      alert("This word does not exist in the dictionary.");
-      return;
+    try {
+      // First check the word as-is (with accents)
+      let isValid = await validateFrenchWord(guess);
+
+      // If invalid, try removing accents but keep the original word for display
+      if (!isValid) {
+        const noAccentGuess = removeAccents(guess);
+        if (noAccentGuess !== guess) {
+          isValid = await validateFrenchWord(noAccentGuess);
+        }
+      }
+
+      if (!isValid) {
+        // Visual feedback - flash red
+        const originalStatuses = [
+          ...words.value[currentAttempt.value].statuses,
+        ];
+        words.value[currentAttempt.value].statuses = Array(
+          wordLength.value
+        ).fill("invalid");
+        await new Promise((resolve) => setTimeout(resolve, 500));
+
+        alert("Ce mot n'existe pas dans le dictionnaire français.");
+        currentInput.value = [];
+        updateBoard();
+        words.value[currentAttempt.value].statuses = originalStatuses;
+        return;
+      }
+    } catch (error) {
+      console.error("Validation error:", error);
+      // Continue game if validation fails
     }
   }
+
+  // Compare with the target word (without accents for game logic)
+  const normalizedGuess = removeAccents(guess);
+  const normalizedTarget = targetWord.value; // Already has no accents
 
   const statuses = Array(wordLength.value).fill("gray");
-  const targetArray = targetWord.value.split("");
+  const targetArray = normalizedTarget.split("");
   const used = Array(wordLength.value).fill(false);
+  const guessArray = normalizedGuess.split("");
 
-  // Green pass
+  // Green pass (exact matches)
   for (let i = 0; i < wordLength.value; i++) {
-    if (guess[i] === targetArray[i]) {
+    if (guessArray[i] === targetArray[i]) {
       statuses[i] = "green";
       used[i] = true;
-      keyStatuses.value[guess[i]] = "green";
+      keyStatuses.value[guess[i]] = "green"; // Use original letter for keyboard
     }
   }
 
-  // Yellow pass
+  // Yellow pass (correct letter wrong position)
   for (let i = 0; i < wordLength.value; i++) {
     if (statuses[i] === "green") continue;
+
     const index = targetArray.findIndex(
-      (c, idx) => c === guess[i] && !used[idx]
+      (c, idx) => c === guessArray[i] && !used[idx]
     );
+
     if (index !== -1) {
       statuses[i] = "yellow";
       used[index] = true;
@@ -448,7 +482,8 @@ async function submitWord() {
 
   words.value[currentAttempt.value].statuses = statuses;
 
-  if (guess === targetWord.value) {
+  // Check win condition against normalized word
+  if (normalizedGuess === normalizedTarget) {
     isWin.value = true;
     gameOver.value = true;
   } else if (currentAttempt.value < maxAttempts.value - 1) {
@@ -456,8 +491,9 @@ async function submitWord() {
     currentInput.value = [];
   } else {
     gameOver.value = true;
-    isWin.value = false;
   }
+
+  saveGame();
 }
 
 async function fetchWord(lang) {
