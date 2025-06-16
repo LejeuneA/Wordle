@@ -7,6 +7,7 @@
         :isWin="isWin"
         :word="targetWordRaw"
         :attempts="currentAttempt + 1"
+        :hintsUsed="hintsUsed"
         @play-again="resetGame"
       />
 
@@ -15,6 +16,27 @@
         <button @click="toggleGameMode" class="toggle-mode">
           {{ isHardMode ? "Switch to Normal Mode" : "Switch to Hard Mode" }}
         </button>
+
+        <!-- Hint button -->
+        <button
+          @click="revealHint"
+          :disabled="hintsUsed >= 2"
+          class="hint-button"
+        >
+          Use Hint ({{ 2 - hintsUsed }} left)
+        </button>
+
+        <!-- Revealed letters display -->
+        <div class="hints-container" v-if="revealedLetters.length > 0">
+          <p>Revealed Letters:</p>
+          <div
+            class="hint-letter"
+            v-for="(letter, idx) in revealedLetters"
+            :key="idx"
+          >
+            {{ letter }}
+          </div>
+        </div>
 
         <!-- Render the words already attempted-->
         <Word
@@ -52,6 +74,8 @@ const currentLanguage = ref("en");
 const isHardMode = ref(localStorage.getItem("wordleMode") === "hard");
 const gameOver = ref(false);
 const isWin = ref(false);
+const hintsUsed = ref(0);
+const revealedLetters = ref([]);
 
 // Dynamic word length and max attempts based on mode
 const wordLength = computed(() => (isHardMode.value ? 7 : 5));
@@ -195,9 +219,103 @@ function removeAccents(str) {
   return str.normalize("NFD").replace(/[̀-ͯ]/g, "");
 }
 
+// Validate a French word using Wiktionary
+async function validateFrenchWord(word) {
+  async function checkWord(w) {
+    const url = `https://fr.wiktionary.org/w/api.php?action=parse&page=${w.toLowerCase()}&prop=text&format=json&origin=*`;
+    try {
+      const res = await fetch(url);
+      const data = await res.json();
+      const html = data.parse?.text["*"];
+      if (!html) return false;
+      return html.includes('langue="fr"') || html.includes("Français");
+    } catch (err) {
+      console.error("Validation error with Wiktionary:", err);
+      return false;
+    }
+  }
+
+  // Try accented version first
+  let valid = await checkWord(word);
+  if (valid) return true;
+
+  // If not valid, try without accents
+  const noAccentWord = removeAccents(word);
+  if (noAccentWord !== word) {
+    valid = await checkWord(noAccentWord);
+  }
+
+  return valid;
+}
+
+function countLetters(word) {
+  const counts = {};
+  for (const letter of word) {
+    counts[letter] = (counts[letter] || 0) + 1;
+  }
+  return counts;
+}
+
+function revealHint() {
+  if (hintsUsed.value >= 2) return;
+
+  const wordLetters = targetWord.value.split("");
+  const letterCounts = countLetters(targetWord.value);
+
+  // Count letters found green in guesses
+  const foundLettersCounts = {};
+
+  for (let i = 0; i <= currentAttempt.value; i++) {
+    const attemptStatuses = words.value[i]?.statuses || [];
+    const attemptLetters = words.value[i]?.letters || [];
+
+    attemptStatuses.forEach((status, idx) => {
+      if (status === "green" || status === "yellow") {
+        const letter = attemptLetters[idx];
+        foundLettersCounts[letter] = (foundLettersCounts[letter] || 0) + 1;
+      }
+    });
+  }
+
+  // Filter letters to reveal:
+  // - Not already fully found (green) in guesses
+  // - Not already revealed by hint
+  const unrevealedLetters = [];
+
+  for (const letter of new Set(wordLetters)) {
+    const foundCount = foundLettersCounts[letter] || 0;
+    const totalCount = letterCounts[letter];
+
+    const alreadyRevealed = revealedLetters.value.includes(letter);
+
+    if (foundCount < totalCount && !alreadyRevealed) {
+      unrevealedLetters.push(letter);
+    }
+  }
+
+  if (unrevealedLetters.length === 0) return;
+
+  // Randomly pick one letter
+  const letter =
+    unrevealedLetters[Math.floor(Math.random() * unrevealedLetters.length)];
+
+  revealedLetters.value.push(letter);
+  hintsUsed.value++;
+  saveGame();
+}
+
 // Watches for changes in reactive data and triggers action
 watch(
-  [words, currentAttempt, currentInput, keyStatuses, targetWord, isHardMode],
+  [
+    words,
+    currentAttempt,
+    currentInput,
+    keyStatuses,
+    targetWord,
+    isHardMode,
+    hintsUsed,
+    revealedLetters,
+  ],
   saveGame,
   {
     deep: true,
@@ -223,6 +341,8 @@ function saveGame() {
     targetWordRaw: targetWordRaw.value,
     language: currentLanguage.value,
     isHardMode: isHardMode.value,
+    hintsUsed: hintsUsed.value,
+    revealedLetters: revealedLetters.value,
   };
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
 }
@@ -241,6 +361,8 @@ function loadGame() {
         targetWordRaw.value = state.targetWordRaw || state.targetWord;
         currentLanguage.value = state.language || "en";
         isHardMode.value = state.isHardMode || false;
+        hintsUsed.value = state.hintsUsed || 0;
+        revealedLetters.value = state.revealedLetters || [];
         updateBoard();
         console.log("Resumed word:", targetWordRaw.value);
         return true;
@@ -282,6 +404,16 @@ async function submitWord() {
   if (currentInput.value.length !== wordLength.value) return;
 
   const guess = currentInput.value.join("");
+
+  // Validate French words
+  if (currentLanguage.value === "fr") {
+    const isValid = await validateFrenchWord(guess);
+    if (!isValid) {
+      alert("This word does not exist in the dictionary.");
+      return;
+    }
+  }
+
   const statuses = Array(wordLength.value).fill("gray");
   const targetArray = targetWord.value.split("");
   const used = Array(wordLength.value).fill(false);
@@ -347,6 +479,8 @@ async function fetchWord(lang) {
 async function initGame() {
   gameOver.value = false;
   isWin.value = false;
+  hintsUsed.value = 0;
+  revealedLetters.value = [];
 
   const lang = localStorage.getItem("wordleLanguage") || "en";
   currentLanguage.value = lang;
@@ -400,6 +534,8 @@ function resetGame() {
   targetWordRaw.value = "";
   gameOver.value = false;
   isWin.value = false;
+  hintsUsed.value = 0;
+  revealedLetters.value = [];
 
   // Initialize a fresh game
   initGame();
@@ -418,6 +554,8 @@ function handleLanguageChange() {
   targetWordRaw.value = "";
   gameOver.value = false;
   isWin.value = false;
+  hintsUsed.value = 0;
+  revealedLetters.value = [];
 
   // Get the new language
   const lang = localStorage.getItem("wordleLanguage") || "en";
@@ -484,6 +622,41 @@ onUnmounted(() => {
 }
 .toggle-mode:hover {
   background-color: #666;
+}
+
+.hint-button {
+  padding: 0.5rem 1rem;
+  margin-bottom: 1rem;
+  background-color: #ffd54f;
+  color: #000;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: background 0.3s ease;
+}
+
+.hint-button:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
+}
+
+.hints-container {
+  margin-bottom: 1rem;
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  align-items: center;
+  font-weight: bold;
+  color: #ffd54f;
+}
+
+.hint-letter {
+  background: #222;
+  padding: 0.5rem 0.7rem;
+  border-radius: 6px;
+  font-size: 1.4rem;
+  user-select: none;
 }
 
 .dark .game-board-wrapper {
