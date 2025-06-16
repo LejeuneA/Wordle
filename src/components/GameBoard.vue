@@ -351,8 +351,22 @@ async function initGame() {
   const lang = localStorage.getItem("wordleLanguage") || "en";
   currentLanguage.value = lang;
 
-  // Tries to load saved game (returns if successful)
-  if (loadGame()) return;
+  // Only load saved game if it's the same language as current
+  const saved = localStorage.getItem(STORAGE_KEY);
+  if (saved) {
+    try {
+      const state = JSON.parse(saved);
+      if (
+        state.language === lang &&
+        state.targetWord &&
+        state.targetWord.length === wordLength.value
+      ) {
+        if (loadGame()) return;
+      }
+    } catch (err) {
+      console.warn("Failed to load saved game:", err);
+    }
+  }
 
   // Fetches a new word of correct length from API (with fallback)
   let raw = "";
@@ -392,7 +406,24 @@ function resetGame() {
 }
 
 function handleLanguageChange() {
+  // Clear the saved game state from localStorage
   localStorage.removeItem(STORAGE_KEY);
+
+  // Reset game state
+  words.value = [];
+  currentAttempt.value = 0;
+  currentInput.value = [];
+  keyStatuses.value = {};
+  targetWord.value = "";
+  targetWordRaw.value = "";
+  gameOver.value = false;
+  isWin.value = false;
+
+  // Get the new language
+  const lang = localStorage.getItem("wordleLanguage") || "en";
+  currentLanguage.value = lang;
+
+  // Initialize a fresh game with the new language
   initGame();
 }
 
