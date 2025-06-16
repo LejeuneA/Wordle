@@ -637,8 +637,12 @@ onUnmounted(() => {
 }
 
 .hint-button:disabled {
-  background-color: var(--white);
+  background-color: transparent;
   cursor: not-allowed;
+}
+
+.dark .hint-button:disabled {
+  color: var(--dark-grey);
 }
 
 .hints-container {
