@@ -627,8 +627,8 @@ onUnmounted(() => {
 .hint-button {
   padding: 0.5rem 1rem;
   margin-bottom: 1rem;
-  background-color: #ffd54f;
-  color: #000;
+  background-color: var(--orange);
+  color: var(--white);
   border: none;
   border-radius: 8px;
   cursor: pointer;
@@ -637,7 +637,7 @@ onUnmounted(() => {
 }
 
 .hint-button:disabled {
-  background-color: #ccc;
+  background-color: var(--white);
   cursor: not-allowed;
 }
 
@@ -648,7 +648,7 @@ onUnmounted(() => {
   justify-content: center;
   align-items: center;
   font-weight: bold;
-  color: #ffd54f;
+  color: var(--orange);
 }
 
 .hint-letter {
@@ -671,5 +671,10 @@ onUnmounted(() => {
 
 .result-container {
   width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  background-color: transparent;
+  box-shadow: none;
 }
 </style>
