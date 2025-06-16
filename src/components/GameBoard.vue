@@ -1,26 +1,37 @@
 <template>
   <div class="game-board-wrapper">
     <div class="game-board">
-      <!-- Toggle between normal and hard mode -->
-      <button @click="toggleGameMode" class="toggle-mode">
-        {{ isHardMode ? "Switch to Normal Mode" : "Switch to Hard Mode" }}
-      </button>
-
-      <!-- Render the words already attempted-->
-      <Word
-        v-for="(word, index) in words"
-        :key="index"
-        :letters="word.letters"
-        :statuses="word.statuses"
+      <!-- Show result when game is over -->
+      <Result
+        v-if="gameOver"
+        :isWin="isWin"
+        :word="targetWordRaw"
+        :attempts="currentAttempt + 1"
+        @play-again="resetGame"
       />
 
-      <!-- Keyboard input component -->
-      <Keyboard
-        :keyStatuses="keyStatuses"
-        @keyPress="handleKeyPress"
-        @submitWord="submitWord"
-        @deleteLetter="deleteLetter"
-      />
+      <template v-else>
+        <!-- Toggle between normal and hard mode -->
+        <button @click="toggleGameMode" class="toggle-mode">
+          {{ isHardMode ? "Switch to Normal Mode" : "Switch to Hard Mode" }}
+        </button>
+
+        <!-- Render the words already attempted-->
+        <Word
+          v-for="(word, index) in words"
+          :key="index"
+          :letters="word.letters"
+          :statuses="word.statuses"
+        />
+
+        <!-- Keyboard input component -->
+        <Keyboard
+          :keyStatuses="keyStatuses"
+          @keyPress="handleKeyPress"
+          @submitWord="submitWord"
+          @deleteLetter="deleteLetter"
+        />
+      </template>
     </div>
   </div>
 </template>
@@ -29,6 +40,7 @@
 import { ref, onMounted, onUnmounted, watch, computed } from "vue";
 import Word from "./Word.vue";
 import Keyboard from "./KeyboardLayout.vue";
+import Result from "./Result.vue";
 
 const words = ref([]);
 const currentAttempt = ref(0);
@@ -38,6 +50,8 @@ const targetWordRaw = ref(""); // Original word (possibly with accents)
 const keyStatuses = ref({});
 const currentLanguage = ref("en");
 const isHardMode = ref(localStorage.getItem("wordleMode") === "hard");
+const gameOver = ref(false);
+const isWin = ref(false);
 
 // Dynamic word length and max attempts based on mode
 const wordLength = computed(() => (isHardMode.value ? 7 : 5));
@@ -181,7 +195,7 @@ function removeAccents(str) {
   return str.normalize("NFD").replace(/[̀-ͯ]/g, "");
 }
 
-// Watches for changes in reactive data and triggers action. When any watched value changes, calls saveGame() function
+// Watches for changes in reactive data and triggers action
 watch(
   [words, currentAttempt, currentInput, keyStatuses, targetWord, isHardMode],
   saveGame,
@@ -303,12 +317,14 @@ async function submitWord() {
   words.value[currentAttempt.value].statuses = statuses;
 
   if (guess === targetWord.value) {
-    alert("Congratulations! You found the word.");
+    isWin.value = true;
+    gameOver.value = true;
   } else if (currentAttempt.value < maxAttempts.value - 1) {
     currentAttempt.value++;
     currentInput.value = [];
   } else {
-    alert(`Too bad! The word was: ${targetWordRaw.value}`);
+    gameOver.value = true;
+    isWin.value = false;
   }
 }
 
@@ -327,8 +343,11 @@ async function fetchWord(lang) {
   }
 }
 
-// Loads or creates a new game. Gets current language from localStorage (defaults to English)
+// Loads or creates a new game
 async function initGame() {
+  gameOver.value = false;
+  isWin.value = false;
+
   const lang = localStorage.getItem("wordleLanguage") || "en";
   currentLanguage.value = lang;
 
@@ -343,18 +362,33 @@ async function initGame() {
 
   // Stores original and processed word
   targetWordRaw.value = raw;
-  // Stores accent-free version
   targetWord.value = removeAccents(raw);
   console.log("New word:", targetWordRaw.value);
 
-  // Clears current input
+  // Resets game state
   currentInput.value = [];
-  // Resets attempt counter
   currentAttempt.value = 0;
-  // Clears keyboard statuses
   keyStatuses.value = {};
   initBoard();
   saveGame();
+}
+
+function resetGame() {
+  // Clear the saved game state from localStorage
+  localStorage.removeItem(STORAGE_KEY);
+
+  // Reset all game state variables
+  words.value = [];
+  currentAttempt.value = 0;
+  currentInput.value = [];
+  keyStatuses.value = {};
+  targetWord.value = "";
+  targetWordRaw.value = "";
+  gameOver.value = false;
+  isWin.value = false;
+
+  // Initialize a fresh game
+  initGame();
 }
 
 function handleLanguageChange() {
@@ -368,13 +402,11 @@ function toggleGameMode() {
   handleLanguageChange();
 }
 
-// When the page loads for the first time loads or creates a new game and it calls handleLanguageChange
 onMounted(() => {
   initGame();
   window.addEventListener("languageChanged", handleLanguageChange);
 });
 
-// When navigating away from the game page removes the event listener to prevent memory leaks
 onUnmounted(() => {
   window.removeEventListener("languageChanged", handleLanguageChange);
 });
@@ -431,5 +463,9 @@ onUnmounted(() => {
 .dark .game-board {
   background-color: var(--white);
   color: var(--white);
+}
+
+.result-container {
+  width: 100%;
 }
 </style>
