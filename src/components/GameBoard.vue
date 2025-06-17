@@ -401,91 +401,96 @@ function updateBoard() {
 }
 
 async function submitWord() {
-  // Don't submit if word isn't complete
   if (currentInput.value.length !== wordLength.value) return;
 
   const guess = currentInput.value.join("");
 
-  // Validate French words against Wiktionary
+  // Special handling for French words
   if (currentLanguage.value === "fr") {
     try {
-      const isValid = await validateFrenchWord(guess);
+      // First check the word as-is (with accents)
+      let isValid = await validateFrenchWord(guess);
+
+      // If invalid, try removing accents but keep the original word for display
       if (!isValid) {
-        // Visual feedback for invalid word
+        const noAccentGuess = removeAccents(guess);
+        if (noAccentGuess !== guess) {
+          isValid = await validateFrenchWord(noAccentGuess);
+        }
+      }
+
+      if (!isValid) {
+        // Visual feedback - flash red
+        const originalStatuses = [
+          ...words.value[currentAttempt.value].statuses,
+        ];
         words.value[currentAttempt.value].statuses = Array(
           wordLength.value
         ).fill("invalid");
-        await new Promise((resolve) => setTimeout(resolve, 500)); // Brief red flash
+        await new Promise((resolve) => setTimeout(resolve, 500));
 
-        alert("Ce mot n'existe pas dans le dictionnaire.");
-        currentInput.value = []; // Clear invalid input
-        updateBoard(); // Refresh display
-        words.value[currentAttempt.value].statuses = Array(
-          wordLength.value
-        ).fill(""); // Reset statuses
+        alert("Ce mot n'existe pas dans le dictionnaire français.");
+        currentInput.value = [];
+        updateBoard();
+        words.value[currentAttempt.value].statuses = originalStatuses;
         return;
       }
     } catch (error) {
       console.error("Validation error:", error);
-      // Fall through if validation fails - don't block the game
+      // Continue game if validation fails
     }
   }
 
-  // Calculate letter statuses
-  const statuses = Array(wordLength.value).fill("gray");
-  const targetArray = targetWord.value.split("");
-  const used = Array(wordLength.value).fill(false);
+  // Compare with the target word (without accents for game logic)
+  const normalizedGuess = removeAccents(guess);
+  const normalizedTarget = targetWord.value; // Already has no accents
 
-  // First pass: mark correct (green) letters
+  const statuses = Array(wordLength.value).fill("gray");
+  const targetArray = normalizedTarget.split("");
+  const used = Array(wordLength.value).fill(false);
+  const guessArray = normalizedGuess.split("");
+
+  // Green pass (exact matches)
   for (let i = 0; i < wordLength.value; i++) {
-    if (guess[i] === targetArray[i]) {
+    if (guessArray[i] === targetArray[i]) {
       statuses[i] = "green";
       used[i] = true;
-      keyStatuses.value[guess[i]] = "green";
+      keyStatuses.value[guess[i]] = "green"; // Use original letter for keyboard
     }
   }
 
-  // Second pass: mark present but wrong position (yellow) letters
+  // Yellow pass (correct letter wrong position)
   for (let i = 0; i < wordLength.value; i++) {
-    if (statuses[i] === "green") continue; // Skip already green letters
+    if (statuses[i] === "green") continue;
 
     const index = targetArray.findIndex(
-      (c, idx) => c === guess[i] && !used[idx]
+      (c, idx) => c === guessArray[i] && !used[idx]
     );
 
     if (index !== -1) {
       statuses[i] = "yellow";
       used[index] = true;
-      // Only update key status if not already green
       if (keyStatuses.value[guess[i]] !== "green") {
         keyStatuses.value[guess[i]] = "yellow";
       }
     } else {
-      // Mark key as gray only if not already marked
       if (!keyStatuses.value[guess[i]]) {
         keyStatuses.value[guess[i]] = "gray";
       }
     }
   }
 
-  // Update the current attempt
   words.value[currentAttempt.value].statuses = statuses;
 
-  // Check for win
-  if (guess === targetWord.value) {
+  // Check win condition against normalized word
+  if (normalizedGuess === normalizedTarget) {
     isWin.value = true;
     gameOver.value = true;
-    saveGame();
-    return;
-  }
-
-  // Move to next attempt or end game
-  if (currentAttempt.value < maxAttempts.value - 1) {
+  } else if (currentAttempt.value < maxAttempts.value - 1) {
     currentAttempt.value++;
     currentInput.value = [];
   } else {
     gameOver.value = true;
-    isWin.value = false;
   }
 
   saveGame();
