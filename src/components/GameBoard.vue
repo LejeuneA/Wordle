@@ -401,96 +401,91 @@ function updateBoard() {
 }
 
 async function submitWord() {
+  // Don't submit if word isn't complete
   if (currentInput.value.length !== wordLength.value) return;
 
   const guess = currentInput.value.join("");
 
-  // Special handling for French words
+  // Validate French words against Wiktionary
   if (currentLanguage.value === "fr") {
     try {
-      // First check the word as-is (with accents)
-      let isValid = await validateFrenchWord(guess);
-
-      // If invalid, try removing accents but keep the original word for display
+      const isValid = await validateFrenchWord(guess);
       if (!isValid) {
-        const noAccentGuess = removeAccents(guess);
-        if (noAccentGuess !== guess) {
-          isValid = await validateFrenchWord(noAccentGuess);
-        }
-      }
-
-      if (!isValid) {
-        // Visual feedback - flash red
-        const originalStatuses = [
-          ...words.value[currentAttempt.value].statuses,
-        ];
+        // Visual feedback for invalid word
         words.value[currentAttempt.value].statuses = Array(
           wordLength.value
         ).fill("invalid");
-        await new Promise((resolve) => setTimeout(resolve, 500));
+        await new Promise((resolve) => setTimeout(resolve, 500)); // Brief red flash
 
-        alert("Ce mot n'existe pas dans le dictionnaire français.");
-        currentInput.value = [];
-        updateBoard();
-        words.value[currentAttempt.value].statuses = originalStatuses;
+        alert("Ce mot n'existe pas dans le dictionnaire.");
+        currentInput.value = []; // Clear invalid input
+        updateBoard(); // Refresh display
+        words.value[currentAttempt.value].statuses = Array(
+          wordLength.value
+        ).fill(""); // Reset statuses
         return;
       }
     } catch (error) {
       console.error("Validation error:", error);
-      // Continue game if validation fails
+      // Fall through if validation fails - don't block the game
     }
   }
 
-  // Compare with the target word (without accents for game logic)
-  const normalizedGuess = removeAccents(guess);
-  const normalizedTarget = targetWord.value; // Already has no accents
-
+  // Calculate letter statuses
   const statuses = Array(wordLength.value).fill("gray");
-  const targetArray = normalizedTarget.split("");
+  const targetArray = targetWord.value.split("");
   const used = Array(wordLength.value).fill(false);
-  const guessArray = normalizedGuess.split("");
 
-  // Green pass (exact matches)
+  // First pass: mark correct (green) letters
   for (let i = 0; i < wordLength.value; i++) {
-    if (guessArray[i] === targetArray[i]) {
+    if (guess[i] === targetArray[i]) {
       statuses[i] = "green";
       used[i] = true;
-      keyStatuses.value[guess[i]] = "green"; // Use original letter for keyboard
+      keyStatuses.value[guess[i]] = "green";
     }
   }
 
-  // Yellow pass (correct letter wrong position)
+  // Second pass: mark present but wrong position (yellow) letters
   for (let i = 0; i < wordLength.value; i++) {
-    if (statuses[i] === "green") continue;
+    if (statuses[i] === "green") continue; // Skip already green letters
 
     const index = targetArray.findIndex(
-      (c, idx) => c === guessArray[i] && !used[idx]
+      (c, idx) => c === guess[i] && !used[idx]
     );
 
     if (index !== -1) {
       statuses[i] = "yellow";
       used[index] = true;
+      // Only update key status if not already green
       if (keyStatuses.value[guess[i]] !== "green") {
         keyStatuses.value[guess[i]] = "yellow";
       }
     } else {
+      // Mark key as gray only if not already marked
       if (!keyStatuses.value[guess[i]]) {
         keyStatuses.value[guess[i]] = "gray";
       }
     }
   }
 
+  // Update the current attempt
   words.value[currentAttempt.value].statuses = statuses;
 
-  // Check win condition against normalized word
-  if (normalizedGuess === normalizedTarget) {
+  // Check for win
+  if (guess === targetWord.value) {
     isWin.value = true;
     gameOver.value = true;
-  } else if (currentAttempt.value < maxAttempts.value - 1) {
+    saveGame();
+    return;
+  }
+
+  // Move to next attempt or end game
+  if (currentAttempt.value < maxAttempts.value - 1) {
     currentAttempt.value++;
     currentInput.value = [];
   } else {
     gameOver.value = true;
+    isWin.value = false;
   }
 
   saveGame();
