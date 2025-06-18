@@ -401,24 +401,42 @@ function updateBoard() {
 }
 
 async function submitWord() {
+  // Don't submit if word isn't complete
   if (currentInput.value.length !== wordLength.value) return;
 
   const guess = currentInput.value.join("");
 
-  // Validate French words
+  // Validate French words against Wiktionary
   if (currentLanguage.value === "fr") {
-    const isValid = await validateFrenchWord(guess);
-    if (!isValid) {
-      alert("This word does not exist in the dictionary.");
-      return;
+    try {
+      const isValid = await validateFrenchWord(guess);
+      if (!isValid) {
+        // Visual feedback for invalid word
+        words.value[currentAttempt.value].statuses = Array(
+          wordLength.value
+        ).fill("invalid");
+        await new Promise((resolve) => setTimeout(resolve, 500)); // Brief red flash
+
+        alert("Ce mot n'existe pas dans le dictionnaire.");
+        currentInput.value = []; // Clear invalid input
+        updateBoard(); // Refresh display
+        words.value[currentAttempt.value].statuses = Array(
+          wordLength.value
+        ).fill(""); // Reset statuses
+        return;
+      }
+    } catch (error) {
+      console.error("Validation error:", error);
+      // Fall through if validation fails - don't block the game
     }
   }
 
+  // Calculate letter statuses
   const statuses = Array(wordLength.value).fill("gray");
   const targetArray = targetWord.value.split("");
   const used = Array(wordLength.value).fill(false);
 
-  // Green pass
+  // First pass: mark correct (green) letters
   for (let i = 0; i < wordLength.value; i++) {
     if (guess[i] === targetArray[i]) {
       statuses[i] = "green";
@@ -427,31 +445,41 @@ async function submitWord() {
     }
   }
 
-  // Yellow pass
+  // Second pass: mark present but wrong position (yellow) letters
   for (let i = 0; i < wordLength.value; i++) {
-    if (statuses[i] === "green") continue;
+    if (statuses[i] === "green") continue; // Skip already green letters
+
     const index = targetArray.findIndex(
       (c, idx) => c === guess[i] && !used[idx]
     );
     if (index !== -1) {
       statuses[i] = "yellow";
       used[index] = true;
+      // Only update key status if not already green
       if (keyStatuses.value[guess[i]] !== "green") {
         keyStatuses.value[guess[i]] = "yellow";
       }
     } else {
+      // Mark key as gray only if not already marked
       if (!keyStatuses.value[guess[i]]) {
         keyStatuses.value[guess[i]] = "gray";
       }
     }
   }
 
+  // Update the current attempt
   words.value[currentAttempt.value].statuses = statuses;
 
+  // Check for win
   if (guess === targetWord.value) {
     isWin.value = true;
     gameOver.value = true;
-  } else if (currentAttempt.value < maxAttempts.value - 1) {
+    saveGame();
+    return;
+  }
+
+  // Move to next attempt or end game
+  if (currentAttempt.value < maxAttempts.value - 1) {
     currentAttempt.value++;
     currentInput.value = [];
   } else {
@@ -470,8 +498,8 @@ async function fetchWord(lang) {
     console.error("Error fetching word:", err);
     const list =
       fallbackWords[lang]?.[isHardMode.value ? "hard" : "easy"] ||
-      fallbackWords["en"].easy;
-    return list[Math.floor(Math.random() * list.length)].toUpperCase();
+      fallbackWords["en, fr, de, es, it, de"].easy;
+    return list[Math.floor(Math.random() * list.length) - 1].toUpperCase();
   }
 }
 
